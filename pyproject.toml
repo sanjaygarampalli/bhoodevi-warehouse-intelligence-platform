@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bwip"
+version = "0.1.0"
+description = "BHOODEVI Warehouse Intelligence Platform (BWIP)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+
+authors = [
+    { name = "Sanjay Garampalli", email = "sanjayhg@bhoodeviwarehouse.com" }
+]
+
+keywords = [
+    "warehouse",
+    "logistics",
+    "ai",
+    "business-intelligence",
+    "lead-generation",
+    "crm",
+    "analytics"
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Office/Business",
+]
+
+dependencies = []
+
+[project.urls]
+Homepage = "https://bhoodeviwarehouse.com"
+Repository = "https://github.com/sanjaygarampalli/bhoodevi-warehouse-intelligence-platform"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
