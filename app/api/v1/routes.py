@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.warehouse import router as warehouse_router
 from app.core.config import settings
 
@@ -24,4 +25,5 @@ def health():
     }
 
 
+router.include_router(auth_router)
 router.include_router(warehouse_router)
