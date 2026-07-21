@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.endpoints.warehouse import router as warehouse_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -21,3 +22,6 @@ def health():
         "status": "healthy",
         "application": "BWIP",
     }
+
+
+router.include_router(warehouse_router)
