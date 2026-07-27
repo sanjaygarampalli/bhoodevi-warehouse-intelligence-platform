@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import List
 
 from sqlalchemy import Boolean, DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -45,4 +46,9 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
+    )
+
+    # Relationships
+    warehouses: Mapped[List["Warehouse"]] = relationship(
+        "Warehouse", back_populates="owner"
     )

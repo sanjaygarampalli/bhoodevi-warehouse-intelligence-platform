@@ -33,14 +33,16 @@ classifiers = [
     "Topic :: Office/Business",
 ]
 
-dependencies = []
+dynamic = ["dependencies"]
 
 [project.urls]
 Homepage = "https://bhoodeviwarehouse.com"
 Repository = "https://github.com/sanjaygarampalli/bhoodevi-warehouse-intelligence-platform"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["app*"]
+exclude = ["app.__pycache__", "app.*.__pycache__"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
