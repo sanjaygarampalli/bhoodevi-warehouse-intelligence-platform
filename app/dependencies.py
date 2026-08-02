@@ -5,16 +5,15 @@ from app.core.security import (
     decode_access_token,
     oauth2_scheme,
 )
-from app.crud import get_user_by_email
 from app.db.session import get_db
 from app.models.user import User
+from app.services.user import UserService
 
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-
     payload = decode_access_token(token)
 
     if payload is None:
@@ -31,10 +30,8 @@ def get_current_user(
             detail="Invalid token",
         )
 
-    user = get_user_by_email(
-        db,
-        email,
-    )
+    user_service = UserService()
+    user = user_service.get_user_by_email(db, email)
 
     if user is None:
         raise HTTPException(
