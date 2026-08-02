@@ -8,17 +8,13 @@ from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
 )
-from app.crud import (
-    authenticate_user,
-    create_user,
-    get_user_by_email,
-)
 from app.db.session import get_db
 from app.schemas.user import (
     Token,
     UserCreate,
     UserResponse,
 )
+from app.services.user import UserService
 
 router = APIRouter(
     prefix="/auth",
@@ -35,7 +31,9 @@ def register(
     user: UserCreate,
     db: Session = Depends(get_db),
 ):
-    existing_user = get_user_by_email(
+    user_service = UserService()
+
+    existing_user = user_service.get_user_by_email(
         db,
         user.email,
     )
@@ -46,7 +44,7 @@ def register(
             detail="Email already registered",
         )
 
-    return create_user(
+    return user_service.create_user(
         db,
         user,
     )
@@ -60,13 +58,15 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    user = authenticate_user(
+    user_service = UserService()
+
+    user = user_service.authenticate_user(
         db,
         form_data.username,
         form_data.password,
     )
 
-    if not user:
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
