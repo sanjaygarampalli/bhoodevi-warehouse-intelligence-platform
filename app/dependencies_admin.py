@@ -8,6 +8,11 @@ def get_current_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
 
+    print("========== ADMIN CHECK ==========")
+    print("Email :", current_user.email)
+    print("Role  :", current_user.role)
+    print("=================================")
+
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
