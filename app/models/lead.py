@@ -109,3 +109,4 @@ class Lead(Base):
     company: Mapped["Company"] = relationship("Company")
     primary_decision_maker: Mapped["DecisionMaker | None"] = relationship("DecisionMaker")
     owner_user: Mapped["User | None"] = relationship("User")
+    activities: Mapped[list["LeadActivity"]] = relationship("LeadActivity", back_populates="lead")
