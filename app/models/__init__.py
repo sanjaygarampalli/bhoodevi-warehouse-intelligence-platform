@@ -5,6 +5,13 @@ from app.models.decision_maker import (
     DecisionMakerStatus,
     PreferredContact,
 )
+from app.models.lead import (
+    Lead,
+    LeadPriority,
+    LeadSource,
+    LeadStatus,
+    MoveInTimeframe,
+)
 from app.models.user import User
 from app.models.warehouse import Warehouse
 
@@ -13,6 +20,11 @@ __all__ = [
     "DecisionLevel",
     "DecisionMaker",
     "DecisionMakerStatus",
+    "Lead",
+    "LeadPriority",
+    "LeadSource",
+    "LeadStatus",
+    "MoveInTimeframe",
     "PreferredContact",
     "User",
     "Warehouse",
