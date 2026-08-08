@@ -20,6 +20,11 @@ from app.models.lead_activity import (
     ActivityType,
     LeadActivity,
 )
+from app.models.requirement import (
+    Requirement,
+    RequirementStatus,
+    WarehouseType,
+)
 from app.models.user import User
 from app.models.warehouse import Warehouse
 
@@ -40,6 +45,9 @@ __all__ = [
     "LeadStatus",
     "MoveInTimeframe",
     "PreferredContact",
+    "Requirement",
+    "RequirementStatus",
     "User",
     "Warehouse",
+    "WarehouseType",
 ]

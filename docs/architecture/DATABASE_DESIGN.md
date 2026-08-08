@@ -2,9 +2,9 @@
 
 **Document:** Complete Database Design (Next Generation)
 
-**Version:** 2.0.0
+**Version:** 2.0.0 (Revised — Requirement Domain added in §5.3)
 
-**Status:** Approved Design
+**Status:** Approved Design (Updated: Requirement entity, Lead Activity & Warehouse Match relationships)
 
 **Last Updated:** August 2026
 
@@ -20,6 +20,7 @@ The database is the foundation for:
 
 - Discovering and researching companies that require warehouse space.
 - Profiling decision makers who control warehouse leasing decisions.
+- Capturing structured warehouse requirements per lead — the primary input for the AI warehouse matching engine.
 - Detecting opportunity signals (news, hiring, factory expansion, import/export activity).
 - Scoring, matching, and recommending leads and warehouses using AI.
 - Executing outreach across Email, LinkedIn, and WhatsApp.
@@ -37,7 +38,7 @@ These conventions apply to every table unless stated otherwise.
 ### 2.1 Identifiers
 
 - Every table has a surrogate primary key `id BIGINT GENERATED ALWAYS AS IDENTITY`.
-- Core externally-exposed entities (organizations, users, companies, warehouses, decision_makers, leads, deals, campaigns) also carry `public_id UUID` with a unique index. Public IDs are used in URLs/APIs; numeric IDs are used internally to avoid enumeration.
+- Core externally-exposed entities (organizations, users, companies, warehouses, decision_makers, leads, requirements, deals, campaigns) also carry `public_id UUID` with a unique index. Public IDs are used in URLs/APIs; numeric IDs are used internally to avoid enumeration.
 - Provider-managed message identifiers (Email, LinkedIn, WhatsApp, AI models) are stored with unique constraints.
 
 ### 2.2 Temporal Columns
@@ -53,7 +54,7 @@ These conventions apply to every table unless stated otherwise.
 
 ### 2.4 Soft Delete
 
-- `is_deleted BOOLEAN NOT NULL DEFAULT FALSE` on master data tables (companies, warehouses, decision_makers, leads, campaigns).
+- `is_deleted BOOLEAN NOT NULL DEFAULT FALSE` on master data tables (companies, warehouses, decision_makers, leads, requirements, campaigns).
 - Queries filter `WHERE is_deleted = FALSE`; a partial index is defined per table to keep the index small.
 
 ### 2.5 Tenant Isolation
@@ -466,7 +467,7 @@ These conventions apply to every table unless stated otherwise.
 
 ### 5.1 `leads`
 
-**Purpose:** Represents a business opportunity — a company (or company-location) with a warehouse requirement that BWIP tracks, nurtures, and converts.
+**Purpose:** Represents a business opportunity — a company (or company-location) with one or more warehouse requirements (see §5.3 `requirements`) that BWIP tracks, nurtures, and converts.
 
 **Primary Key:** `id`
 
@@ -476,7 +477,7 @@ These conventions apply to every table unless stated otherwise.
 
 - N—1 with `companies`.
 - N—1 with `users` (owner).
-- 1—N with `lead_activities`, `lead_score_snapshots`, `warehouse_matches`, `ai_recommendations`, `opportunity_signals`, `follow_up_tasks`, `deals`, `emails`, `linkedin_messages`, `whatsapp_messages`.
+- 1—N with `requirements`, `lead_activities`, `lead_score_snapshots`, `warehouse_matches`, `ai_recommendations`, `opportunity_signals`, `follow_up_tasks`, `deals`, `emails`, `linkedin_messages`, `whatsapp_messages`.
 
 | Column | Data Type | Nullable | Description |
 |---|---|---|---|
@@ -527,6 +528,8 @@ These conventions apply to every table unless stated otherwise.
 - `CHECK (ai_score IS NULL OR (ai_score >= 0 AND ai_score <= 100))`
 - `CHECK (move_in_timeframe IN ('IMMEDIATE','1_3_MONTHS','3_6_MONTHS','6_12_MONTHS','FLEXIBLE'))`
 
+> **Requirement-domain note:** the lead-level columns above (`space_needed_sqft`, `warehouse_type`, `preferred_cities`, `budget_per_month`, `move_in_timeframe`, `lease_tenure_years`) are retained as **summary fields** for lead-list dashboards and backward compatibility. The canonical, structured warehouse requirement for a lead now lives in `requirements` (§5.3). New integrations must write requirement detail to `requirements`; the lead-level fields are denormalized from it (see §11.5).
+
 ---
 
 ### 5.2 `lead_activities`
@@ -535,11 +538,12 @@ These conventions apply to every table unless stated otherwise.
 
 **Primary Key:** `id`
 
-**Foreign Keys:** `organization_id → organizations(id)`, `lead_id → leads(id)`, `user_id → users(id)`, `related_activity_id` (self, via source reference), audit user FKs.
+**Foreign Keys:** `organization_id → organizations(id)`, `lead_id → leads(id)`, `requirement_id → requirements(id)` (optional), `user_id → users(id)`, `related_activity_id` (self, via source reference), audit user FKs.
 
 **Relationships:**
 
 - N—1 with `leads`.
+- N—1 with `requirements` (optional — activity context for a specific requirement).
 - N—1 with `users` (actor).
 - Optional 1—1 with message tables (`emails`, `linkedin_messages`, `whatsapp_messages`) via `activity_source_type` + `activity_source_id`.
 
@@ -548,6 +552,7 @@ These conventions apply to every table unless stated otherwise.
 | id | BIGINT IDENTITY | No | Primary key |
 | organization_id | BIGINT | No | Owning tenant |
 | lead_id | BIGINT | No | Parent lead |
+| requirement_id | BIGINT | Yes | Optional linked requirement |
 | activity_type | VARCHAR(30) | No | CHECK: CALL, EMAIL, LINKEDIN, WHATSAPP, MEETING, NOTE, TASK, SYSTEM_EVENT, AI_ACTION, SIGNAL, PROPOSAL, OTHER |
 | channel | VARCHAR(20) | Yes | EMAIL, LINKEDIN, WHATSAPP, PHONE, FACE_TO_FACE, SYSTEM |
 | subject | VARCHAR(255) | Yes | Short subject |
@@ -566,6 +571,7 @@ These conventions apply to every table unless stated otherwise.
 **Indexes:**
 
 - `ix_lead_activities__lead_id__occurred_at` (descending)
+- `ix_lead_activities__requirement_id`
 - `ix_lead_activities__activity_type__occurred_at`
 - `ix_lead_activities__activity_source_type__activity_source_id` unique where not null
 - `ix_lead_activities__user_id`
@@ -578,7 +584,111 @@ These conventions apply to every table unless stated otherwise.
 
 ---
 
-### 5.3 `opportunity_signals` (Base / Supertype Table)
+### 5.3 `requirements`
+
+**Purpose:** Represents a single warehouse requirement received from a client for a lead (business opportunity). A lead may carry multiple requirements — e.g., multiple cities, expansion phases, or product categories. The `requirements` table is the **primary input for the AI Warehouse Matching Engine** and the canonical source of structured warehouse-demand detail.
+
+**Primary Key:** `id`
+
+**Foreign Keys:** `organization_id → organizations(id)`, `lead_id → leads(id) ON DELETE CASCADE`, `created_by_user_id/updated_by_user_id → users(id)`.
+
+**Relationships:**
+
+- N—1 with `leads` (parent opportunity).
+- N—1 with `organizations` (tenant).
+- 1—N with `warehouse_matches` (match results at requirement granularity).
+- 1—N with `lead_activities` (optional per-requirement activity context).
+
+| Column | Data Type | Nullable | Description |
+|---|---|---|---|
+| id | BIGINT IDENTITY | No | Primary key |
+| public_id | UUID | No | External identifier |
+| organization_id | BIGINT | No | Owning tenant |
+| lead_id | BIGINT | No | Parent lead |
+| title | VARCHAR(255) | No | Short requirement title |
+| description | TEXT | Yes | Free-form requirement detail |
+| industry | VARCHAR(150) | Yes | Client industry (mirrors `industries.name`) |
+| goods_type | VARCHAR(150) | Yes | Goods to be stored |
+| storage_type | VARCHAR(30) | Yes | CHECK: AMBIENT, TEMPERATURE_CONTROLLED, CHILLER, FREEZER, HAZMAT, BONDED, OPEN_YARD, AGRICULTURAL, OTHER |
+| compliance_requirements | TEXT | Yes | Licenses/certifications needed (FSSAI, ISO, hazmat…) |
+| required_builtup_area | NUMERIC(14,2) | Yes | Required covered built-up area (sq ft) |
+| required_open_area | NUMERIC(14,2) | Yes | Required open yard area (sq ft) |
+| minimum_area | NUMERIC(14,2) | Yes | Minimum acceptable area (sq ft) |
+| maximum_area | NUMERIC(14,2) | Yes | Maximum acceptable area (sq ft) |
+| preferred_state | VARCHAR(100) | Yes | Preferred state |
+| preferred_city | VARCHAR(100) | Yes | Preferred city |
+| preferred_locality | VARCHAR(150) | Yes | Preferred locality/industrial zone |
+| preferred_pincode | VARCHAR(20) | Yes | Preferred PIN code |
+| latitude | NUMERIC(9,6) | Yes | Preferred site latitude |
+| longitude | NUMERIC(9,6) | Yes | Preferred site longitude |
+| radius_km | NUMERIC(10,2) | Yes | Acceptable radius around preferred location |
+| budget_per_sqft | NUMERIC(14,2) | Yes | Budget per sq ft (INR) |
+| lease_duration_months | SMALLINT | Yes | Desired lease term (months) |
+| security_deposit_months | SMALLINT | Yes | Acceptable security deposit (months) |
+| preferred_lease_type | VARCHAR(30) | Yes | CHECK: LEASE, LEAVE_AND_LICENSE, RENTAL, BUILD_TO_SUIT, REVENUE_SHARE, OTHER |
+| escalation_percentage | NUMERIC(5,2) | Yes | Acceptable annual escalation % |
+| warehouse_type | VARCHAR(30) | Yes | CHECK: COVERED, OPEN_YARD, COLD_STORAGE, BONDED, MULTIPURPOSE, CONTAINER, TRANSIT, OTHER |
+| loading_bays_required | SMALLINT | Yes | Number of loading bays |
+| dock_level_required | BOOLEAN | No | Dock-level loading required |
+| ground_level_required | BOOLEAN | No | Ground-level loading required |
+| office_required | BOOLEAN | No | Office space required |
+| labour_required | BOOLEAN | No | Labour/manpower required |
+| required_clear_height | NUMERIC(8,2) | Yes | Required clear height (ft) |
+| required_floor_load | NUMERIC(10,2) | Yes | Required floor load (kg/sqm) |
+| required_power_load | NUMERIC(10,2) | Yes | Required power load (kVA) |
+| required_docks | SMALLINT | Yes | Number of docks |
+| truck_parking_required | BOOLEAN | No | Truck parking required |
+| rail_connectivity_required | BOOLEAN | No | Rail siding required |
+| fire_noc_required | BOOLEAN | No | Fire NOC required |
+| temperature_controlled | BOOLEAN | No | Temperature-controlled facility required |
+| operating_hours | VARCHAR(50) | Yes | Desired operating hours (e.g. "24x7", "10:00-22:00") |
+| expected_monthly_dispatch | NUMERIC(16,2) | Yes | Expected monthly dispatch volume |
+| expected_monthly_receipts | NUMERIC(16,2) | Yes | Expected monthly receipt volume |
+| move_in_timeframe | VARCHAR(20) | Yes | CHECK: IMMEDIATE, 1_3_MONTHS, 3_6_MONTHS, 6_12_MONTHS, FLEXIBLE |
+| requirement_status | VARCHAR(20) | No | CHECK: DRAFT, ACTIVE, ON_HOLD, CLOSED, CANCELLED |
+| ai_match_score | NUMERIC(5,2) | Yes | AI warehouse-match fit 0–100 (model generated) |
+| requirement_score | NUMERIC(5,2) | Yes | AI requirement quality/completeness 0–100 (model generated) |
+| priority_score | NUMERIC(5,2) | Yes | AI priority/urgency 0–100 (model generated) |
+| confidence_score | NUMERIC(5,2) | Yes | AI confidence 0–100 (model generated) |
+| is_deleted | BOOLEAN | No | Soft delete flag |
+| created_at | TIMESTAMPTZ | No | Creation timestamp |
+| updated_at | TIMESTAMPTZ | No | Last update timestamp |
+| created_by_user_id | BIGINT | Yes | Recording user (null = AI/system) |
+| updated_by_user_id | BIGINT | Yes | Last modifying user |
+
+**Indexes:**
+
+- `uq_requirements__public_id` unique
+- `ix_requirements__lead_id`
+- `ix_requirements__organization_id__requirement_status`
+- `ix_requirements__organization_id__requirement_status__priority_score` composite (workspace + AI prioritization)
+- `ix_requirements__preferred_state__preferred_city`
+- `ix_requirements__ai_match_score` (descending)
+- `ix_requirements__lat__lng` (for PostGIS GiST upgrade)
+- `ix_requirements__is_deleted` partial `WHERE is_deleted = FALSE`
+
+**Constraints:**
+
+- `CHECK (warehouse_type IN ('COVERED','OPEN_YARD','COLD_STORAGE','BONDED','MULTIPURPOSE','CONTAINER','TRANSIT','OTHER'))`
+- `CHECK (move_in_timeframe IN ('IMMEDIATE','1_3_MONTHS','3_6_MONTHS','6_12_MONTHS','FLEXIBLE'))`
+- `CHECK (requirement_status IN ('DRAFT','ACTIVE','ON_HOLD','CLOSED','CANCELLED'))`
+- `CHECK (preferred_lease_type IN ('LEASE','LEAVE_AND_LICENSE','RENTAL','BUILD_TO_SUIT','REVENUE_SHARE','OTHER'))`
+- `CHECK (storage_type IN ('AMBIENT','TEMPERATURE_CONTROLLED','CHILLER','FREEZER','HAZMAT','BONDED','OPEN_YARD','AGRICULTURAL','OTHER'))`
+- `CHECK (latitude IS NULL OR (latitude BETWEEN -90 AND 90))`
+- `CHECK (longitude IS NULL OR (longitude BETWEEN -180 AND 180))`
+- `CHECK (minimum_area IS NULL OR maximum_area IS NULL OR minimum_area <= maximum_area)`
+- `CHECK (ai_match_score IS NULL OR (ai_match_score >= 0 AND ai_match_score <= 100))` (same range constraint applies to `requirement_score`, `priority_score`, `confidence_score`)
+
+**Future AI Usage:**
+
+- `requirements` is the source of truth consumed by the **AI Warehouse Matching Engine** (see [AI_AGENTS.md](./AI_AGENTS.md)): every match candidate is scored against a specific requirement row.
+- `ai_match_score` stores the engine's top match fit for the requirement; `priority_score` ranks requirements across the lead/opportunity workspace so BD teams focus on the highest-impact needs.
+- `requirement_score` and `confidence_score` feed model explainability, thresholding (e.g., auto-route only matches above a confidence floor), and evaluation datasets via `warehouse_matches` outcomes.
+- Score columns are **model-generated placeholders** — no AI logic runs in the application layer; the matching/scoring agents write these fields when they execute.
+
+---
+
+### 5.4 `opportunity_signals` (Base / Supertype Table)
 
 **Purpose:** Supertype table for all detected business signals that imply warehouse demand. Concrete signal detail rows (news, hiring, factory expansion, import/export) extend this table via 1:1 foreign keys (Class Table Inheritance).
 
@@ -639,7 +749,7 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 ---
 
-### 5.4 `company_news` (Signal Subtype)
+### 5.5 `company_news` (Signal Subtype)
 
 **Purpose:** Concrete details for signals of type `COMPANY_NEWS` — news about expansion, investment, strategy, partnerships, or restructuring that implies warehouse demand.
 
@@ -675,7 +785,7 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 ---
 
-### 5.5 `hiring_signals` (Signal Subtype)
+### 5.6 `hiring_signals` (Signal Subtype)
 
 **Purpose:** Concrete details for signals of type `HIRING` — job postings in logistics, operations, supply-chain, procurement, or plant roles that suggest operational growth and warehouse need.
 
@@ -716,7 +826,7 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 ---
 
-### 5.6 `factory_expansion_signals` (Signal Subtype)
+### 5.7 `factory_expansion_signals` (Signal Subtype)
 
 **Purpose:** Concrete details for signals of type `FACTORY_EXPANSION` — new plants, facility expansions, relocations, or closures that change warehouse demand.
 
@@ -758,7 +868,7 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 ---
 
-### 5.7 `import_export_signals` (Signal Subtype)
+### 5.8 `import_export_signals` (Signal Subtype)
 
 **Purpose:** Concrete details for signals of type `IMPORT_EXPORT` — trade activity, new licenses, shipment volumes, and logistics tenders that indicate warehousing, cross-docking, or bonded-storage demand.
 
@@ -861,23 +971,25 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 ### 6.2 `warehouse_matches`
 
-**Purpose:** Stores AI-generated and human-curated matches between a lead requirement and a specific warehouse, including match score, ranking, geo distance, fit reasons, and disposition.
+**Purpose:** Stores AI-generated and human-curated matches between a lead's warehouse requirement and a specific warehouse, including match score, ranking, geo distance, fit reasons, and disposition. Each match is scoped to a specific `requirements` row (§5.3); matches created before the requirements model existed carry only the legacy lead-level requirement fields (`requirement_id` NULL).
 
 **Primary Key:** `id`
 
-**Foreign Keys:** `organization_id → organizations(id)`, `lead_id → leads(id)`, `warehouse_id → warehouses(id)`, `reviewed_by_user_id → users(id)`, audit user FKs.
+**Foreign Keys:** `organization_id → organizations(id)`, `lead_id → leads(id)`, `requirement_id → requirements(id)` (optional), `warehouse_id → warehouses(id)`, `reviewed_by_user_id → users(id)`, audit user FKs.
 
 **Relationships:**
 
-- N—1 with `leads`.
-- N—1 with `warehouses`.
+- N—1 with `leads` (context opportunity).
+- N—1 with `requirements` (matched requirement — canonical demand target).
+- N—1 with `warehouses` (candidate).
 - Referenced by `deals` when a match becomes a deal.
 
 | Column | Data Type | Nullable | Description |
 |---|---|---|---|
 | id | BIGINT IDENTITY | No | Primary key |
 | organization_id | BIGINT | No | Owning tenant |
-| lead_id | BIGINT | No | Lead requirement |
+| lead_id | BIGINT | No | Parent lead (context) |
+| requirement_id | BIGINT | Yes | Matched requirement (canonical demand record) |
 | warehouse_id | BIGINT | No | Warehouse candidate |
 | match_score | NUMERIC(5,2) | No | Composite 0–100 |
 | match_rank | SMALLINT | Yes | Rank within lead set |
@@ -901,7 +1013,9 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 
 **Indexes:**
 
-- `uq_warehouse_matches__lead__warehouse` unique on `(lead_id, warehouse_id)`
+- `uq_warehouse_matches__requirement__warehouse` unique partial on `(requirement_id, warehouse_id) WHERE requirement_id IS NOT NULL`
+- `uq_warehouse_matches__lead__warehouse` unique partial on `(lead_id, warehouse_id) WHERE requirement_id IS NULL` (legacy lead-level matches)
+- `ix_warehouse_matches__requirement_id__match_score` (descending)
 - `ix_warehouse_matches__lead_id__match_score` (descending)
 - `ix_warehouse_matches__warehouse_id__status`
 - `ix_warehouse_matches__status`
@@ -1513,22 +1627,23 @@ This table stores common signal metadata: source, timing, relevance, AI intent, 
 | 2 | Warehouses | `warehouses` |
 | 3 | Decision Makers | `decision_makers` |
 | 4 | Leads | `leads` |
-| 5 | Lead Activities | `lead_activities` |
-| 6 | Opportunity Signals | `opportunity_signals` (base) |
-| 7 | Lead Scoring | `lead_score_snapshots` |
-| 8 | Warehouse Matching | `warehouse_matches` |
-| 9 | AI Recommendations | `ai_recommendations` |
-| 10 | Outreach Campaigns | `outreach_campaigns`, `campaign_members` |
-| 11 | Emails | `emails` |
-| 12 | LinkedIn Messages | `linkedin_messages` |
-| 13 | WhatsApp Messages | `whatsapp_messages` |
-| 14 | Follow-up Tasks | `follow_up_tasks` |
-| 15 | Deal Pipeline | `deal_pipeline_stages`, `deals`, `deal_stage_history` |
-| 16 | Company News | `company_news` |
-| 17 | Hiring Signals | `hiring_signals` |
-| 18 | Factory Expansion Signals | `factory_expansion_signals` |
-| 19 | Import Export Signals | `import_export_signals` |
-| 20 | AI Learning History | `ai_learning_history` |
+| 5 | Requirements | `requirements` |
+| 6 | Lead Activities | `lead_activities` |
+| 7 | Opportunity Signals | `opportunity_signals` (base) |
+| 8 | Lead Scoring | `lead_score_snapshots` |
+| 9 | Warehouse Matching | `warehouse_matches` |
+| 10 | AI Recommendations | `ai_recommendations` |
+| 11 | Outreach Campaigns | `outreach_campaigns`, `campaign_members` |
+| 12 | Emails | `emails` |
+| 13 | LinkedIn Messages | `linkedin_messages` |
+| 14 | WhatsApp Messages | `whatsapp_messages` |
+| 15 | Follow-up Tasks | `follow_up_tasks` |
+| 16 | Deal Pipeline | `deal_pipeline_stages`, `deals`, `deal_stage_history` |
+| 17 | Company News | `company_news` |
+| 18 | Hiring Signals | `hiring_signals` |
+| 19 | Factory Expansion Signals | `factory_expansion_signals` |
+| 20 | Import Export Signals | `import_export_signals` |
+| 21 | AI Learning History | `ai_learning_history` |
 
 **Supporting/foundation tables:** `organizations`, `users`, `industries`.
 
@@ -1544,6 +1659,7 @@ organizations
    ├── 1─N warehouses
    ├── 1─N companies
    ├── 1─N leads
+   ├── 1─N requirements
    ├── 1─N outreach_campaigns
    ├── 1─N deal_pipeline_stages
    ├── 1─N deals
@@ -1561,6 +1677,7 @@ companies
    └── 1─N messages (email / linkedin / whatsapp)
 
 leads
+   ├── 1─N requirements
    ├── 1─N lead_activities
    ├── 1─N lead_score_snapshots
    ├── 1─N warehouse_matches
@@ -1569,6 +1686,10 @@ leads
    ├── 1─N follow_up_tasks
    ├── 1─N messages
    └── 1─N deals
+
+requirements
+   ├── 1─N warehouse_matches
+   └── 1─N lead_activities (optional requirement context)
 
 opportunity_signals
    ├── 1─1 company_news
@@ -1608,9 +1729,10 @@ deals ── 1─N deal_stage_history
 ### 10.2 Key Relationship Narratives
 
 - **Tenant scoping:** every business table belongs to exactly one `organizations` row. Row-Level Security keys off this column.
-- **Company → Lead:** a company can produce many leads (one per distinct warehouse requirement/location).
+- **Company → Lead:** a company can produce many leads (one per distinct business opportunity/location).
+- **Lead → Requirement:** a lead can carry multiple structured warehouse requirements (`requirements`: multiple cities, expansion phases, product categories). `requirements` is the canonical warehouse-demand record and the primary input to the AI matching engine.
+- **Requirement ↔ Warehouse:** resolved through `warehouse_matches`, each of which references a specific `requirements` row (legacy matches without `requirement_id` fall back to the lead-level requirement summary fields).
 - **Signal → Lead:** an `opportunity_signals` row may reference the lead it created (`leads.lead_id`); signal subtype detail lives in exactly one of the four subtype tables via a unique 1:1 FK.
-- **Lead ↔ Warehouse:** resolved only through `warehouse_matches` (avoiding N—N, keeping match metadata).
 - **Message → Activity:** each sent Email/LinkedIn/WhatsApp message optionally creates exactly one `lead_activities` row (`activity_source_type` + `activity_source_id`), so the lead timeline stays unified across channels.
 - **Campaign membership:** `campaign_members` resolves campaign ↔ decision-maker, carrying per-member sequence state; recipient messages point to both campaign and member.
 - **Pipeline:** `deals` reference a configurable `stage_id`; `deal_stage_history` records every transition immutably.
@@ -1661,6 +1783,7 @@ Performance-motivated, application-maintained redundant values with a defined ca
 | `leads.ai_score` | `lead_score_snapshots.total_score` (latest) | Fast dashboard sorting/filtering |
 | `leads.latest_score_snapshot_id` | `lead_score_snapshots` | Direct pointer, avoids MAX() scan |
 | `leads.last_activity_at` | `lead_activities.occurred_at` | Timeline/funnel queries without GROUP BY |
+| `leads.space_needed_sqft` / `warehouse_type` / `preferred_cities` / `budget_per_month` / `move_in_timeframe` / `lease_tenure_years` | `requirements` (canonical demand detail) | Legacy/summary display on lead list views; new integrations write to `requirements` |
 | `deals.forecast_amount` | `expected_revenue × probability` | Report rollups without computation |
 | `outreach_campaigns.sent_count / open_count / reply_count` | message & member tables | Campaign stats without COUNT() joins |
 
@@ -1670,7 +1793,7 @@ All denormalized values are refreshed by application services (or triggers) on t
 
 - Foreign keys enforce integrity at the database level.
 - Critical business dependencies use `RESTRICT` (e.g., deleting a company with leads is blocked).
-- Pure child details use `CASCADE` (signal subtypes, stage history).
+- Pure child details use `CASCADE` (signal subtypes, stage history, `requirements` under `leads`).
 - Audit references use `SET NULL` so history survives user deletion.
 - Smart unique constraints prevent duplicates: provider message IDs, signal `dedup_hash`, company `domain`, decision-maker `(company_id, email)`, match `(lead_id, warehouse_id)`.
 
@@ -1703,6 +1826,7 @@ Recommended strategy: PostgreSQL native **range partitioning on `created_at` (mo
 - Bulk `DETACH PARTITION` archival to cold storage (S3/Parquet) without downtime.
 - Fast time-window scans (e.g., last 90 days of activities).
 - `ai_learning_history` treated as near-immutable — ideal for append-only partitioning.
+- `requirements` is intentionally **not** partition-listed: it is updated by AI scoring writes; focused composite indexes (see §13.1) keep it on the OLTP primary.
 
 ### 12.3 Horizontal Scaling
 
@@ -1716,16 +1840,18 @@ Recommended strategy: PostgreSQL native **range partitioning on `created_at` (mo
 - Downstream **data warehouse**:
   - `fact_lead_activities`
   - `fact_lead_scores`
+  - `fact_lead_requirements`
   - `fact_messages`
   - `fact_signal_events`
   - `fact_deal_stage_history`
-  - Dimensions: company, warehouse, decision_maker, campaign, user, time, geography.
+  - Dimensions: company, warehouse, requirement, decision_maker, campaign, user, time, geography.
 - dbt transformations build funnel, conversion, channel-performance, and forecast models.
 - Dashboards query the warehouse or Postgres materialized views, never the OLTP hot path.
 
 ### 12.5 AI / ML Platform Evolution
 
 - `ai_learning_history` is the raw event log and training-corpus source.
+- `requirements` is the canonical demand input; `warehouse_matches` (requirement-scoped) plus `requirements.ai_match_score` / `priority_score` provide labeled fit and outcome data for the matching engine.
 - `lead_score_snapshots` + `warehouse_matches` + `ai_recommendations.status/feedback` provide labeled outcome data for model evaluation, offline metrics, and RLHF-style feedback loops.
 - A future feature store can project score factors and signal aggregates into vectors without schema changes (JSONB payloads already structured).
 
@@ -1752,6 +1878,7 @@ Recommended strategy: PostgreSQL native **range partitioning on `created_at` (mo
 - **Every foreign key is indexed** to support join paths and cascade enforcement.
 - **Composite indexes** match real query patterns, not single columns:
   - Lead workspace: `(organization_id, status, owner_user_id)`
+  - Requirement workspace & AI prioritization: `(organization_id, requirement_status, priority_score)`; `ai_match_score` descending
   - Follow-ups: `(assigned_to_user_id, status, due_at)`
   - Timeline: `(lead_id, occurred_at DESC) INCLUDE (activity_type, subject, summary)`
   - Pipeline: `(stage_id, expected_close_date)`
@@ -1769,6 +1896,7 @@ Recommended strategy: PostgreSQL native **range partitioning on `created_at` (mo
 | Hot Query | Supporting Design |
 |---|---|
 | Lead dashboard (status, owner, score) | Composite index + denormalized `ai_score`, `last_activity_at` |
+| Requirement detail & AI prioritization | `requirements` composite `(organization_id, requirement_status, priority_score)`; `ai_match_score` (desc) |
 | Lead timeline | Covering index on `lead_activities (lead_id, occurred_at)` |
 | Open follow-ups for today | Index `(assigned_to_user_id, status, due_at)` |
 | Pipeline forecast by stage | Index `(stage_id, expected_close_date)`; `forecast_amount` precomputed |
@@ -1804,6 +1932,7 @@ Controlled redundancy (Section 11.5) eliminates the most expensive aggregation q
 ### 13.7 Application-Level Guardrails
 
 - Use `SELECT IN (…)`/`JOIN` batching instead of N+1 (especially leads → activities/scoring).
+- Requirement lists eager-load the parent lead and latest `warehouse_matches`; never lazy-load per-row score columns in list screens.
 - Use `selectinload`/`joinedload` for known aggregates; avoid lazy-loading JSONB payloads on list screens.
 - All list endpoints enforce tenant scoping (`organization_id`) at the query level, backed by RLS.
 
@@ -1814,12 +1943,13 @@ Controlled redundancy (Section 11.5) eliminates the most expensive aggregation q
 This schema delivers a normalized, tenant-isolated, AI-native foundation that:
 
 1. Distinguishes the platform's own customers (`organizations`) from researched prospects (`companies`).
-2. Models warehouse supply (`warehouses`) and warehouse demand (`leads`) as first-class citizens.
+2. Models warehouse supply (`warehouses`) and warehouse demand (`leads` + `requirements`) as first-class citizens, with `requirements` as the primary input for the AI matching engine.
 3. Captures every business signal through a normalized supertype/subtype model that is trivially extensible.
 4. Makes AI explainable and auditable through immutable scoring snapshots, recommendation records, and a complete AI learning history.
 5. Unifies all outreach channels under campaign + message structures with a single lead timeline.
 6. Supports a configurable deal pipeline with immutable stage history.
 7. Is built for millions of rows through partitioning, composite/partial indexing, controlled denormalization, and clear read/write path separation.
+8. Elevates each client warehouse requirement to a first-class, structured record (`requirements`) that carries location, technical, financial, timeline, status, and AI score detail per lead.
 
 ---
 
