@@ -144,3 +144,6 @@ class Requirement(Base):
 
     # Relationships
     lead: Mapped["Lead"] = relationship("Lead", back_populates="requirements")
+    warehouse_matches: Mapped[list["WarehouseMatch"]] = relationship(
+        "WarehouseMatch", back_populates="requirement"
+    )

@@ -7,6 +7,7 @@ from app.api.v1.endpoints.lead import router as lead_router
 from app.api.v1.endpoints.lead_activity import router as lead_activity_router
 from app.api.v1.endpoints.requirement import router as requirement_router
 from app.api.v1.endpoints.warehouse import router as warehouse_router
+from app.api.v1.endpoints.warehouse_match import router as warehouse_match_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -37,3 +38,4 @@ router.include_router(decision_maker_router)
 router.include_router(lead_router)
 router.include_router(lead_activity_router)
 router.include_router(requirement_router)
+router.include_router(warehouse_match_router)

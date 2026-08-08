@@ -57,7 +57,12 @@ class Lead(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    lead_number: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
+    lead_number: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
 
     company_id: Mapped[int] = mapped_column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
 
@@ -114,4 +119,9 @@ class Lead(Base):
         "Requirement",
         back_populates="lead",
         cascade="all, delete-orphan"
+    )
+    warehouse_matches: Mapped[list["WarehouseMatch"]] = relationship(
+        "WarehouseMatch",
+        back_populates="lead",
+        cascade="all, delete-orphan",
     )

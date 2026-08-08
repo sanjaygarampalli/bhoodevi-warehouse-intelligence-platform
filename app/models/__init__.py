@@ -26,9 +26,17 @@ from app.models.requirement import (
     WarehouseType,
 )
 from app.models.user import User
-from app.models.warehouse import Warehouse
+from app.models.warehouse import AvailabilityStatus, Warehouse
+from app.models.warehouse_match import (
+    MatchedBy,
+    WarehouseMatch,
+    WarehouseMatchStatus,
+)
 
 __all__ = [
+    "MatchedBy",
+    "WarehouseMatch",
+    "WarehouseMatchStatus",
     "ActivityChannel",
     "ActivityOutcome",
     "ActivitySourceType",
@@ -45,9 +53,12 @@ __all__ = [
     "LeadStatus",
     "MoveInTimeframe",
     "PreferredContact",
+    "AvailabilityStatus",
     "Requirement",
     "RequirementStatus",
     "User",
     "Warehouse",
+    "WarehouseMatch",
+    "WarehouseMatchStatus",
     "WarehouseType",
 ]
