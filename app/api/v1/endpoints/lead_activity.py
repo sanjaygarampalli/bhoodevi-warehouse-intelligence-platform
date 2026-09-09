@@ -83,6 +83,12 @@ def update_existing_lead_activity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
+    existing = lead_activity_service.get_lead_activity_by_id(db, activity_id)
+    if existing is None or existing.lead_id != lead_id:
+        raise HTTPException(status_code=404, detail="Lead Activity not found")
+    if "lead_id" in activity.model_fields_set and activity.lead_id != lead_id:
+        raise HTTPException(status_code=400, detail="lead_id must match the URL")
+
     updated = lead_activity_service.update_lead_activity(
         db,
         activity_id,
@@ -105,6 +111,10 @@ def delete_existing_lead_activity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
+    existing = lead_activity_service.get_lead_activity_by_id(db, activity_id)
+    if existing is None or existing.lead_id != lead_id:
+        raise HTTPException(status_code=404, detail="Lead Activity not found")
+
     deleted = lead_activity_service.delete_lead_activity(
         db,
         activity_id,

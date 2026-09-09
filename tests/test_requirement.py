@@ -15,11 +15,21 @@ from app.models import (
     LeadSource,
     LeadStatus,
     MoveInTimeframe,
+    OrgType,
+    Organization,
+    OrganizationStatus,
     Requirement,
     RequirementStatus,
     User,
     WarehouseType,
 )
+
+# Check if SubscriptionTier exists
+try:
+    from app.models import SubscriptionTier
+    HAS_SUBSCRIPTION_TIER = True
+except ImportError:
+    HAS_SUBSCRIPTION_TIER = False
 from app.repositories.requirement import RequirementRepository
 from app.schemas.requirement import (
     RequirementCreate,
@@ -49,7 +59,24 @@ def db_session():
 
 @pytest.fixture()
 def company(db_session):
+    import uuid
+    org = Organization(
+        public_id=str(uuid.uuid4()),
+        org_code="ORG-REQ",
+        legal_name="Req Tenant Pvt. Ltd.",
+        org_type=OrgType.PVT_LTD,
+        country="India",
+        subscription_tier="GROWTH" if not HAS_SUBSCRIPTION_TIER else None,
+        status=OrganizationStatus.ACTIVE,
+    )
+    if HAS_SUBSCRIPTION_TIER:
+        org.subscription_tier = SubscriptionTier.GROWTH
+    db_session.add(org)
+    db_session.commit()
+    db_session.refresh(org)
+
     company = Company(
+        organization_id=org.id,
         company_name="Acme Corp",
         industry="Manufacturing",
         company_type="Private",

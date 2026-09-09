@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
@@ -9,6 +10,8 @@ from app.schemas.warehouse_match import (
     WarehouseMatchCreate,
     WarehouseMatchResponse,
     WarehouseMatchUpdate,
+    WarehouseMatchRecommendationResponse,
+    WarehouseMatchGenerationResponse,
 )
 from app.services.warehouse_match import WarehouseMatchService
 
@@ -18,6 +21,36 @@ router = APIRouter(
 )
 
 match_service = WarehouseMatchService()
+
+
+@router.post("/requirements/{requirement_id}/generate", response_model=WarehouseMatchGenerationResponse)
+def generate_warehouse_matches(
+    requirement_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    """Generate or refresh persisted rule-based matches without replacing reviews."""
+    try:
+        result = match_service.generate_matches_for_requirement(db, requirement_id)
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Match data changed concurrently; retry generation") from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    return result
+
+
+@router.get("/requirements/{requirement_id}/recommendations", response_model=WarehouseMatchRecommendationResponse)
+def recommend_warehouses(
+    requirement_id: int,
+    limit: int = Query(default=100, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Recalculate ranked recommendations without modifying saved matches."""
+    result = match_service.recommend_for_requirement(db, requirement_id, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    return result
 
 
 @router.post("/", response_model=WarehouseMatchResponse)

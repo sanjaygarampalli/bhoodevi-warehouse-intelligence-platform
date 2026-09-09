@@ -13,7 +13,6 @@ config = context.config
 
 # Read database URL from .env
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-print("ALEMBIC DATABASE URL:", repr(settings.DATABASE_URL))
 
 # Configure logging
 if config.config_file_name is not None:

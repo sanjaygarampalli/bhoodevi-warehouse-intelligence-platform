@@ -38,7 +38,7 @@ class CompanyBase(BaseModel):
 
 
 class CompanyCreate(CompanyBase):
-    pass
+    organization_id: int = Field(..., gt=0)
 
 
 class CompanyUpdate(BaseModel):
@@ -73,6 +73,7 @@ class CompanyUpdate(BaseModel):
 
 class CompanyResponse(CompanyBase):
     id: int
+    organization_id: int
     created_at: datetime
     updated_at: datetime
 

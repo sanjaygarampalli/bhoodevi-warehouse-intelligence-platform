@@ -123,7 +123,10 @@ class Requirement(Base):
     expected_monthly_receipts: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
 
     # Timeline
-    move_in_timeframe: Mapped[MoveInTimeframe | None] = mapped_column(Enum(MoveInTimeframe, name="moveintimeframe"), nullable=True)
+    move_in_timeframe: Mapped[MoveInTimeframe | None] = mapped_column(
+        Enum(MoveInTimeframe, name="moveintimeframe", values_callable=lambda values: [item.value for item in values]),
+        nullable=True,
+    )
 
     # Status
     requirement_status: Mapped[RequirementStatus] = mapped_column(Enum(RequirementStatus, name="requirementstatus"), nullable=False, default=RequirementStatus.DRAFT, index=True)

@@ -83,6 +83,12 @@ def update_existing_requirement(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
+    existing = requirement_service.get_requirement_by_id(db, requirement_id)
+    if existing is None or existing.lead_id != lead_id:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    if "lead_id" in requirement.model_fields_set and requirement.lead_id != lead_id:
+        raise HTTPException(status_code=400, detail="lead_id must match the URL")
+
     updated = requirement_service.update_requirement(
         db,
         requirement_id,
@@ -105,6 +111,10 @@ def delete_existing_requirement(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin),
 ):
+    existing = requirement_service.get_requirement_by_id(db, requirement_id)
+    if existing is None or existing.lead_id != lead_id:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+
     deleted = requirement_service.delete_requirement(
         db,
         requirement_id,

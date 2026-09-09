@@ -46,7 +46,8 @@ def register(
 
     return user_service.create_user(
         db,
-        user,
+        # Public registration must not grant client-selected privileges.
+        user.model_copy(update={"role": "user"}),
     )
 
 

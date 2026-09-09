@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -8,11 +8,22 @@ from app.db.base import Base
 
 class Company(Base):
     __tablename__ = "companies"
+    __table_args__ = (
+        Index("ix_companies__organization_id", "organization_id"),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
         index=True,
+    )
+
+    organization_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "organizations.id", name="fk_companies__organization_id", ondelete="RESTRICT"
+        ),
+        nullable=False,
     )
 
     company_name: Mapped[str] = mapped_column(
@@ -100,4 +111,9 @@ class Company(Base):
     decision_makers: Mapped[list["DecisionMaker"]] = relationship(
         "DecisionMaker",
         back_populates="company",
+    )
+
+    organization_owners: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="companies",
     )

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.services.deal_workflow import protect_deal_reference
 
 from app.models.requirement import Requirement
 from app.repositories.lead import LeadRepository
@@ -63,6 +64,7 @@ class RequirementService:
         update_data = requirement.model_dump(exclude_unset=True)
 
         if "lead_id" in update_data and update_data["lead_id"] != db_requirement.lead_id:
+            protect_deal_reference(db, "requirement", requirement_id)
             lead = self.lead_repository.get_by_id(
                 db,
                 update_data["lead_id"],
@@ -92,6 +94,7 @@ class RequirementService:
         if db_requirement is None:
             return None
 
+        protect_deal_reference(db, "requirement", requirement_id)
         self.repository.delete(
             db,
             db_requirement,

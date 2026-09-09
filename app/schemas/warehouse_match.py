@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.models.warehouse_match import MatchedBy, WarehouseMatchStatus
+from app.services.warehouse_matching_rules import WarehouseMatchLevel, classify_match
 
 
 class WarehouseMatchCreate(BaseModel):
@@ -54,6 +55,11 @@ class WarehouseMatchUpdate(BaseModel):
 class WarehouseMatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    @computed_field
+    @property
+    def match_level(self) -> WarehouseMatchLevel:
+        return classify_match(self.match_score)
+
     id: int
     lead_id: int
     requirement_id: int | None
@@ -77,3 +83,51 @@ class WarehouseMatchResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class WarehouseMatchReason(BaseModel):
+    factor: str
+    points: int = Field(ge=0, le=100)
+    maximum_points: int = Field(ge=0, le=100)
+    explanation: str
+
+
+class WarehouseMatchAdjustment(BaseModel):
+    factor: str
+    points: int = Field(le=0)
+    score_cap: int = Field(ge=0, le=100)
+    explanation: str
+
+
+class WarehouseMatchResult(BaseModel):
+    warehouse_id: int
+    warehouse_name: str
+    match_rank: int = Field(default=1, ge=1)
+    match_score: int = Field(ge=0, le=100)
+    match_level: WarehouseMatchLevel
+    reasons: list[WarehouseMatchReason]
+    adjustments: list[WarehouseMatchAdjustment]
+    warnings: list[str]
+    existing_match_id: int | None = None
+    existing_match_status: WarehouseMatchStatus | None = None
+
+
+class WarehouseMatchRecommendationResponse(BaseModel):
+    requirement_id: int
+    lead_id: int
+    scoring_version: str
+    candidates_evaluated: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    matches: list[WarehouseMatchResult]
+    warnings: list[str]
+
+
+class WarehouseMatchGenerationResponse(BaseModel):
+    requirement_id: int
+    scoring_version: str
+    candidates_evaluated: int = Field(ge=0)
+    created: int = Field(ge=0)
+    refreshed: int = Field(ge=0)
+    stale: int = Field(ge=0)
+    preserved: int = Field(ge=0)
+    warnings: list[str]

@@ -1,9 +1,20 @@
 from app.models.company import Company
+from app.models.follow_up_task import FollowUpTask, TaskStatus, TaskType
+from app.models.deal import Deal
+from app.models.deal_pipeline_stage import DealPipelineStage
+from app.models.deal_stage_history import DealStageHistory
 from app.models.decision_maker import (
     DecisionLevel,
     DecisionMaker,
     DecisionMakerStatus,
     PreferredContact,
+)
+from app.models.industry import Industry
+from app.models.organization import (
+    Organization,
+    OrgType,
+    OrganizationStatus,
+    SubscriptionTier,
 )
 from app.models.lead import (
     Lead,
@@ -25,6 +36,7 @@ from app.models.requirement import (
     RequirementStatus,
     WarehouseType,
 )
+from app.models.lead_score_snapshot import LeadScoreSnapshot
 from app.models.user import User
 from app.models.warehouse import AvailabilityStatus, Warehouse
 from app.models.warehouse_match import (
@@ -34,6 +46,12 @@ from app.models.warehouse_match import (
 )
 
 __all__ = [
+    "FollowUpTask",
+    "TaskStatus",
+    "TaskType",
+    "Deal",
+    "DealPipelineStage",
+    "DealStageHistory",
     "MatchedBy",
     "WarehouseMatch",
     "WarehouseMatchStatus",
@@ -46,7 +64,13 @@ __all__ = [
     "DecisionLevel",
     "DecisionMaker",
     "DecisionMakerStatus",
+    "Industry",
+    "Organization",
+    "OrgType",
+    "OrganizationStatus",
+    "SubscriptionTier",
     "Lead",
+    "LeadScoreSnapshot",
     "LeadActivity",
     "LeadPriority",
     "LeadSource",

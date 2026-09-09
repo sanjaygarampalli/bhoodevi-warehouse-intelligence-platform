@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.services.deal_workflow import protect_deal_reference
 
 from app.models.warehouse import Warehouse
 from app.repositories.warehouse import WarehouseRepository
@@ -94,6 +95,7 @@ class WarehouseService:
         if db_warehouse is None:
             return None
 
+        protect_deal_reference(db, "warehouse", warehouse_id)
         self.repository.delete(
             db,
             db_warehouse,

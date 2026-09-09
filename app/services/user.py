@@ -4,6 +4,7 @@ from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.user import UserCreate
+from app.services.follow_up_workflow import protect_task_reference
 
 
 class UserService:
@@ -66,6 +67,7 @@ class UserService:
         db: Session,
         user: User,
     ):
+        protect_task_reference(db, "user", user.id)
         return self.repository.delete(db, user)
 
     def authenticate_user(
@@ -76,7 +78,7 @@ class UserService:
     ) -> User | None:
         user = self.get_user_by_email(db, email)
 
-        if user is None:
+        if user is None or not user.is_active:
             return None
 
         if not verify_password(

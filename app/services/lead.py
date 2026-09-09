@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from app.services.deal_workflow import protect_deal_reference
+from app.services.follow_up_workflow import protect_task_reference
 
 from app.models.lead import Lead
 from app.repositories.company import CompanyRepository
@@ -75,6 +77,10 @@ class LeadService:
 
         update_data = lead.model_dump(exclude_unset=True)
 
+        if "company_id" in update_data and update_data["company_id"] != db_lead.company_id:
+            protect_task_reference(db, "lead", lead_id)
+            protect_deal_reference(db, "lead", lead_id)
+
         for key, value in update_data.items():
             setattr(db_lead, key, value)
 
@@ -96,6 +102,8 @@ class LeadService:
         if db_lead is None:
             return None
 
+        protect_deal_reference(db, "lead", lead_id)
+        protect_task_reference(db, "lead", lead_id)
         self.repository.delete(
             db,
             db_lead,

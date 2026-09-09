@@ -86,7 +86,10 @@ class Lead(Base):
 
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True, default="INR")
 
-    move_in_timeframe: Mapped[MoveInTimeframe | None] = mapped_column(Enum(MoveInTimeframe, name="moveintimeframe"), nullable=True)
+    move_in_timeframe: Mapped[MoveInTimeframe | None] = mapped_column(
+        Enum(MoveInTimeframe, name="moveintimeframe", values_callable=lambda values: [item.value for item in values]),
+        nullable=True,
+    )
 
     lease_tenure_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -124,4 +127,10 @@ class Lead(Base):
         "WarehouseMatch",
         back_populates="lead",
         cascade="all, delete-orphan",
+    )
+    score_snapshots: Mapped[list["LeadScoreSnapshot"]] = relationship(
+        "LeadScoreSnapshot",
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

@@ -1,21 +1,32 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from app.services.deal_workflow import protect_deal_reference
+from app.services.follow_up_workflow import protect_task_reference
 
 from app.models.company import Company
 from app.repositories.company import CompanyRepository
+from app.repositories.organization import OrganizationRepository
 from app.schemas.company import CompanyCreate, CompanyUpdate
 
 
 class CompanyService:
     def __init__(self) -> None:
         self.repository = CompanyRepository()
+        self.organization_repository = OrganizationRepository()
 
     def create_company(
         self,
         db: Session,
         company: CompanyCreate,
     ) -> Company:
+        if self.organization_repository.get_by_id(db, company.organization_id) is None:
+            raise LookupError("Organization not found")
         db_company = Company(**company.model_dump())
-        return self.repository.create(db, db_company)
+        try:
+            return self.repository.create(db, db_company)
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError("Company conflicts with existing data") from exc
 
     def get_company_by_id(
         self,
@@ -98,6 +109,8 @@ class CompanyService:
         if db_company is None:
             return None
 
+        protect_deal_reference(db, "company", company_id)
+        protect_task_reference(db, "company", company_id)
         self.repository.delete(
             db,
             db_company,
