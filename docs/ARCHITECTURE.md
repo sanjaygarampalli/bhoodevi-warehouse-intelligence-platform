@@ -65,6 +65,10 @@ transitions and application-level append-only history. It describes the migratio
 API contracts, design differences from the long-term database blueprint, and the
 limits of history immutability, concurrency and organization authorization.
 
+## Operational Intelligence Dashboard — Phase 1
+
+[Operational Intelligence Dashboard](architecture/OPERATIONAL_INTELLIGENCE_DASHBOARD.md) documents the read-only aggregation layer that combines existing prioritization, follow-up, pipeline, warehouse matching, requirement, and lead activity data into one authenticated operational view.
+
 ## Follow-up Tasks — Phase 1
 
 [Follow-up Tasks](architecture/FOLLOW_UP_TASKS.md) documents the assigned work-queue

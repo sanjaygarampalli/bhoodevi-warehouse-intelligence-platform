@@ -628,7 +628,7 @@ class ProspectPrioritizationService:
         now = evaluated_at or datetime.now(timezone.utc)
         ls = LeadStatus(status) if status and status in {s.value for s in LeadStatus} else None
         total, retained = 0, []
-        from app.schemas.lead_intelligence import evaluate_lead as _eval
+        from app.services.lead_intelligence import evaluate_lead as _eval
         for lead in LeadRepository().iter_for_intelligence(db, industry=industry, organization_id=organization_id, has_active_requirement=has_active_requirement, status=ls):
             i = _eval(lead, calculated_at=now)
             r = evaluate_lead_priority(lead, tasks_for_lead(db, lead.id), deal_for_lead(db, lead.id), i, max_stage_order(db, lead), evaluated_at=now)
@@ -674,7 +674,7 @@ class ProspectPrioritizationService:
 
     def dashboard_summary(self, db, organization_id=None, top_n=5, evaluated_at=None):
         now = evaluated_at or datetime.now(timezone.utc)
-        from app.schemas.lead_intelligence import evaluate_lead as _eval
+        from app.services.lead_intelligence import evaluate_lead as _eval
         all_leads = list(LeadRepository().iter_for_intelligence(db, organization_id=organization_id))
         lr = []
         for L in all_leads:
