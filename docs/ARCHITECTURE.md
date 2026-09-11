@@ -85,3 +85,10 @@ the read-only orchestration layer that turns existing prioritization, lead
 intelligence, follow-up, deal, activity, and warehouse-match outputs into a
 deduplicated prioritized action queue. It does not introduce a second scoring
 engine or persistence model.
+
+## Organization Access Control
+
+[Organization Access Control](architecture/ORGANIZATION_ACCESS_CONTROL.md) documents
+the explicit user-to-organization membership model, organization roles, centralized
+authorization dependencies, membership API, and organization-aware intelligence
+scoping foundation.

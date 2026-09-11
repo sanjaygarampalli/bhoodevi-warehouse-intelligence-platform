@@ -208,3 +208,6 @@ class Organization(Base):
     # Relationships
     industry: Mapped["Industry | None"] = relationship("Industry")
     companies: Mapped[list["Company"]] = relationship("Company", back_populates="organization_owners")
+    memberships: Mapped[list["OrganizationMembership"]] = relationship(
+        "OrganizationMembership", back_populates="organization", cascade="all, delete-orphan"
+    )

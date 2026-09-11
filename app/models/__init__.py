@@ -16,6 +16,11 @@ from app.models.organization import (
     OrganizationStatus,
     SubscriptionTier,
 )
+from app.models.organization_membership import (
+    MembershipStatus,
+    OrganizationMemberRole,
+    OrganizationMembership,
+)
 from app.models.lead import (
     Lead,
     LeadPriority,
@@ -68,6 +73,9 @@ __all__ = [
     "Organization",
     "OrgType",
     "OrganizationStatus",
+    "OrganizationMembership",
+    "OrganizationMemberRole",
+    "MembershipStatus",
     "SubscriptionTier",
     "Lead",
     "LeadScoreSnapshot",

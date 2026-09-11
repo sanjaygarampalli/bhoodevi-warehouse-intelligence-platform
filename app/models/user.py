@@ -55,3 +55,6 @@ class User(Base):
     reviewed_warehouse_matches: Mapped[List["WarehouseMatch"]] = relationship(
         "WarehouseMatch", back_populates="reviewed_by_user"
     )
+    organization_memberships: Mapped[List["OrganizationMembership"]] = relationship(
+        "OrganizationMembership", back_populates="user", cascade="all, delete-orphan"
+    )

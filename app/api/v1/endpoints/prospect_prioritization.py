@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.services.organization_access import require_organization_access
 from app.schemas.lead import LeadStatus
 from app.schemas.prospect_prioritization import (
     LeadPriorityListResponse,
@@ -32,6 +33,8 @@ def read_priority_dashboard(
     current_user: User = Depends(get_current_user),
 ):
     """Return aggregate priority counts and the top leads/opportunities."""
+    if organization_id is not None:
+        require_organization_access(db, current_user, organization_id)
     return prioritization_service.dashboard_summary(
         db, organization_id=organization_id, top_n=top_n,
     )
@@ -50,6 +53,8 @@ def list_priority_leads(
     current_user: User = Depends(get_current_user),
 ):
     """Return ranked lead priorities without persisting a snapshot."""
+    if organization_id is not None:
+        require_organization_access(db, current_user, organization_id)
     return prioritization_service.list_lead_priorities(
         db,
         limit=limit,
@@ -85,6 +90,8 @@ def list_priority_opportunities(
     current_user: User = Depends(get_current_user),
 ):
     """Return ranked deal/opportunity priorities."""
+    if organization_id is not None:
+        require_organization_access(db, current_user, organization_id)
     return prioritization_service.list_opportunity_priorities(
         db,
         limit=limit,

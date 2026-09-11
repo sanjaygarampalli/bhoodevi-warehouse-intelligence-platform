@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.deal import Deal
+from app.models.company import Company
 from app.models.follow_up_task import FollowUpTask, TaskStatus, as_utc
 from app.models.lead import Lead, LeadStatus
 from app.models.requirement import Requirement, RequirementStatus
@@ -82,29 +83,32 @@ class ActionIntelligenceService:
             ranking_score=ranking_score,
         )
 
-    def _build(self, db: Session, now: datetime):
+    def _build(self, db: Session, now: datetime, organization_id=None):
         lead_results = self.prioritization.list_lead_priorities(
-            db, limit=200, evaluated_at=now,
+            db, limit=200, organization_id=organization_id, evaluated_at=now,
         ).items
-        leads = {lead.id: lead for lead in db.scalars(select(Lead).options(
+        lead_stmt = select(Lead).join(Company, Lead.company_id == Company.id).options(
             joinedload(Lead.company), joinedload(Lead.primary_decision_maker),
-        )).all()}
+        )
+        if organization_id is not None:
+            lead_stmt = lead_stmt.where(Company.organization_id == organization_id)
+        leads = {lead.id: lead for lead in db.scalars(lead_stmt).all()}
         tasks = list(db.scalars(select(FollowUpTask).where(
             FollowUpTask.status.in_(OPEN_TASK_STATUSES),
-        ).order_by(FollowUpTask.due_at, FollowUpTask.id)).all())
+        ).where(FollowUpTask.lead_id.in_(leads) if leads else False).order_by(FollowUpTask.due_at, FollowUpTask.id)).all())
         tasks_by_lead = {}
         for task in tasks:
             tasks_by_lead.setdefault(task.lead_id, []).append(task)
         deals = list(db.scalars(select(Deal).options(
             joinedload(Deal.lead).joinedload(Lead.company), joinedload(Deal.stage),
-        ).where(Deal.deal_status == "OPEN")).all())
+        ).where(Deal.deal_status == "OPEN", Deal.lead_id.in_(leads) if leads else False)).all())
         deals_by_lead = {}
         for deal in deals:
             deals_by_lead.setdefault(deal.lead_id, []).append(deal)
         matches = list(db.scalars(select(WarehouseMatch).where(
             WarehouseMatch.match_score >= HIGH_MATCH_SCORE,
             WarehouseMatch.status.notin_((WarehouseMatchStatus.REJECTED, WarehouseMatchStatus.STALE)),
-        ).order_by(WarehouseMatch.match_score.desc(), WarehouseMatch.id)).all())
+        ).where(WarehouseMatch.lead_id.in_(leads) if leads else False).order_by(WarehouseMatch.match_score.desc(), WarehouseMatch.id)).all())
         matches_by_lead = {}
         for match in matches:
             matches_by_lead.setdefault(match.lead_id, []).append(match)
@@ -179,26 +183,26 @@ class ActionIntelligenceService:
             -list(PriorityLevel).index(item.priority), -item.ranking_score, item.id,
         )), len([x for x in candidates.values() if x.action_type == ActionType.FOLLOW_UP_OVERDUE]), len([x for x in candidates.values() if x.action_type == ActionType.REENGAGE_COLD_LEAD]), len([x for x in candidates.values() if x.action_type == ActionType.DEAL_AT_RISK]), len([x for x in candidates.values() if x.action_type == ActionType.REVIEW_HIGH_MATCH])
 
-    def get_prioritized_actions(self, db, *, limit=50, priority=None, action_type=None):
+    def get_prioritized_actions(self, db, *, limit=50, priority=None, action_type=None, organization_id=None):
         now = self.clock().astimezone(timezone.utc)
-        items, *_ = self._build(db, now)
+        items, *_ = self._build(db, now, organization_id)
         if priority:
             items = [item for item in items if item.priority == priority]
         if action_type:
             items = [item for item in items if item.action_type == action_type]
         return ActionRecommendationListResponse(items=items[:limit], total=len(items), limit=limit, evaluated_at=now)
 
-    def get_today_actions(self, db, *, limit=20):
-        return self.get_prioritized_actions(db, limit=limit)
+    def get_today_actions(self, db, *, limit=20, organization_id=None):
+        return self.get_prioritized_actions(db, limit=limit, organization_id=organization_id)
 
-    def get_lead_actions(self, db, lead_id, *, limit=50):
-        result = self.get_prioritized_actions(db, limit=100)
+    def get_lead_actions(self, db, lead_id, *, limit=50, organization_id=None):
+        result = self.get_prioritized_actions(db, limit=100, organization_id=organization_id)
         items = [item for item in result.items if item.lead_id == lead_id]
         return ActionRecommendationListResponse(items=items[:limit], total=len(items), limit=limit, evaluated_at=result.evaluated_at)
 
-    def get_action_summary(self, db):
+    def get_action_summary(self, db, organization_id=None):
         now = self.clock().astimezone(timezone.utc)
-        items, overdue, stale, risky, matches = self._build(db, now)
+        items, overdue, stale, risky, matches = self._build(db, now, organization_id)
         return ActionIntelligenceSummaryResponse(
             total_actions=len(items), critical_actions=sum(x.priority == PriorityLevel.CRITICAL for x in items),
             high_priority_actions=sum(x.priority == PriorityLevel.HIGH for x in items), overdue_follow_ups=overdue,
