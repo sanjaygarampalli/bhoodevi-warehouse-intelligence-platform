@@ -10,17 +10,32 @@ from app.models.lead import Lead, LeadStatus
 from app.models.lead_activity import LeadActivity
 from app.models.requirement import Requirement, RequirementStatus
 from app.models.warehouse_match import WarehouseMatch, WarehouseMatchStatus
-from app.schemas.operational_dashboard import *
+from app.schemas.operational_dashboard import (
+    AttentionItem,
+    ExecutiveSummary,
+    LeadHealthSummary,
+    OperationalDashboard,
+    PipelineStageSummary,
+    PipelineSummary,
+    PriorityDashboardItem,
+    RecentActivityItem,
+    WarehouseOpportunityItem,
+    WarehouseOpportunitySummary,
+)
 from app.schemas.prospect_prioritization import NextBestActionType, PriorityLevel
 from app.services.lead_scoring_rules import HIGH_MATCH_SCORE, VIABLE_MATCH_SCORE
 from app.services.prospect_prioritization import ProspectPrioritizationService
+from app.services.action_intelligence import ActionIntelligenceService
 
 ACTIVE_LEAD_STATUSES = tuple(s for s in LeadStatus if s not in {LeadStatus.WON, LeadStatus.LOST, LeadStatus.DISQUALIFIED})
 
 class OperationalDashboardService:
-    def __init__(self, *, prioritization_service=None, clock=None):
+    def __init__(self, *, prioritization_service=None, action_service=None, clock=None):
         self.prioritization = prioritization_service or ProspectPrioritizationService()
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.actions = action_service or ActionIntelligenceService(
+            prioritization_service=self.prioritization, clock=self.clock,
+        )
 
     @staticmethod
     def _action(result):
@@ -81,4 +96,5 @@ class OperationalDashboardService:
         health = LeadHealthSummary(high_intelligence_leads=sum(bool(result_by_lead.get(x.id) and (result_by_lead[x.id].intelligence_score or 0) >= 75) for x in active), medium_intelligence_leads=sum(bool(result_by_lead.get(x.id) and 50 <= (result_by_lead[x.id].intelligence_score or 0) < 75) for x in active), low_intelligence_leads=sum(not result_by_lead.get(x.id) or (result_by_lead[x.id].intelligence_score or 0) < 50 for x in active), leads_with_recent_activity=len(recent_ids), leads_becoming_inactive=sum(x.id not in recent_ids for x in active), leads_without_decision_makers=sum(x.primary_decision_maker_id is None for x in active), leads_without_requirements=sum(x.id not in {r.lead_id for r in active_req_rows} for x in active), leads_needing_qualification=sum(bool(result_by_lead.get(x.id) and self._action(result_by_lead[x.id]) == NextBestActionType.QUALIFY_REQUIREMENT.value) for x in active))
         warehouse = WarehouseOpportunitySummary(strong_matches=len(strong), leads_with_matching_potential=len(viable_leads), requirements_needing_matching=sum(r.id not in matched_req for r in active_req_rows), top_opportunities=[WarehouseOpportunityItem(lead_id=m.lead_id, requirement_id=m.requirement_id, match_id=m.id, match_score=m.match_score, status=getattr(m.status, "value", str(m.status)), top_reason=m.top_reason) for m in strong[:top_priorities_limit]])
         ranked = sorted(leads + opportunities, key=lambda x: (-list(PriorityLevel).index(x.priority_level), -x.priority_score, x.lead_id if hasattr(x, "lead_number") else x.deal_id))
-        return OperationalDashboard(generated_at=now, executive_summary=ExecutiveSummary(total_active_leads=len(active), critical_priority_leads=sum(x.priority_level == PriorityLevel.CRITICAL for x in leads), high_priority_leads=sum(x.priority_level == PriorityLevel.HIGH for x in leads), overdue_follow_ups=len(overdue), follow_ups_due_today=len(due_today), active_opportunities=len(open_deals), active_deals=len(open_deals), deals_at_risk=len(at_risk), strong_warehouse_matches=len(strong), new_leads=sum(x.status == LeadStatus.NEW for x in rows)), todays_attention=self._attention(leads, opportunities, tasks, now, attention_limit), pipeline_summary=PipelineSummary(stages=pipeline_stages, active_deals=len(open_deals), won_deals=sum(x.deal_status == "WON" for x in deals), lost_deals=sum(x.deal_status == "LOST" for x in deals), deals_requiring_follow_up=len({x.deal_id for x in open_tasks if x.deal_id}), potential_opportunities=len(open_deals)), lead_health=health, warehouse_opportunities=warehouse, top_priorities=[self._priority_item(x) for x in ranked[:top_priorities_limit]], recent_activity=recent)
+        action_summary = self.actions.get_action_summary(db)
+        return OperationalDashboard(generated_at=now, executive_summary=ExecutiveSummary(total_active_leads=len(active), critical_priority_leads=sum(x.priority_level == PriorityLevel.CRITICAL for x in leads), high_priority_leads=sum(x.priority_level == PriorityLevel.HIGH for x in leads), overdue_follow_ups=len(overdue), follow_ups_due_today=len(due_today), active_opportunities=len(open_deals), active_deals=len(open_deals), deals_at_risk=len(at_risk), strong_warehouse_matches=len(strong), new_leads=sum(x.status == LeadStatus.NEW for x in rows), critical_actions=action_summary.critical_actions, overdue_actions=action_summary.overdue_follow_ups, todays_actions=action_summary.total_actions), todays_attention=self._attention(leads, opportunities, tasks, now, attention_limit), pipeline_summary=PipelineSummary(stages=pipeline_stages, active_deals=len(open_deals), won_deals=sum(x.deal_status == "WON" for x in deals), lost_deals=sum(x.deal_status == "LOST" for x in deals), deals_requiring_follow_up=len({x.deal_id for x in open_tasks if x.deal_id}), potential_opportunities=len(open_deals)), lead_health=health, warehouse_opportunities=warehouse, top_priorities=[self._priority_item(x) for x in ranked[:top_priorities_limit]], recent_activity=recent)

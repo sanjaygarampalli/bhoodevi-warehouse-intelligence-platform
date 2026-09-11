@@ -16,6 +16,7 @@ from app.api.v1.endpoints.warehouse_match import router as warehouse_match_route
 from app.api.v1.endpoints.workflow import router as workflow_router
 from app.api.v1.endpoints.prospect_prioritization import router as prospect_prioritization_router
 from app.api.v1.endpoints.operational_dashboard import router as operational_dashboard_router
+from app.api.v1.endpoints.action_intelligence import router as action_intelligence_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -55,3 +56,4 @@ router.include_router(follow_up_task_router)
 router.include_router(workflow_router)
 router.include_router(prospect_prioritization_router)
 router.include_router(operational_dashboard_router)
+router.include_router(action_intelligence_router)

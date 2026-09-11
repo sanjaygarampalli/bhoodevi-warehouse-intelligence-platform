@@ -27,6 +27,9 @@ class ExecutiveSummary(BaseModel):
     deals_at_risk: int = Field(ge=0)
     strong_warehouse_matches: int = Field(ge=0)
     new_leads: int = Field(ge=0)
+    critical_actions: int = Field(ge=0, default=0)
+    overdue_actions: int = Field(ge=0, default=0)
+    todays_actions: int = Field(ge=0, default=0)
 
 
 class PipelineStageSummary(BaseModel):

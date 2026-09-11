@@ -77,3 +77,11 @@ due date, assignment and OPEN/IN_PROGRESS/COMPLETED/CANCELLED lifecycle. Overdue
 computed dynamically, Lead/Deal consistency is validated in the service, and a partial
 unique index prevents duplicate active tasks per recommendation. It complements, and does
 not duplicate, the existing LeadActivity interaction record.
+
+## Action & Follow-up Intelligence — Phase 1
+
+[Action & Follow-up Intelligence](architecture/ACTION_INTELLIGENCE.md) documents
+the read-only orchestration layer that turns existing prioritization, lead
+intelligence, follow-up, deal, activity, and warehouse-match outputs into a
+deduplicated prioritized action queue. It does not introduce a second scoring
+engine or persistence model.

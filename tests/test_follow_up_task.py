@@ -12,7 +12,7 @@ from app.core.security import create_access_token
 from app.models import Company, Deal, FollowUpTask, Lead, LeadActivity, LeadScoreSnapshot, User
 from app.models.follow_up_task import TaskType, as_utc
 from app.schemas.follow_up_task import (
-    FollowUpTaskCreate, FollowUpTaskUpdate, NextActionTaskCreate, TaskCancellation, TaskCompletion,
+    FollowUpTaskCreate, FollowUpTaskResponse, FollowUpTaskUpdate, NextActionTaskCreate, TaskCancellation, TaskCompletion,
 )
 from app.services.follow_up_task import FollowUpTaskService
 from app.services.follow_up_workflow import TaskConflict, TaskNotFound
@@ -227,6 +227,32 @@ def test_filters_queues_pagination_order_and_no_n_plus_one(work):
         assert len(statements) == 1
     finally:
         event.remove(db.bind, "before_cursor_execute", capture)
+
+
+def test_response_normalizes_legacy_string_timestamps():
+    response = FollowUpTaskResponse.model_validate({
+        "id": 1,
+        "lead_id": 1,
+        "deal_id": None,
+        "assigned_to_user_id": None,
+        "subject": "Call prospect",
+        "description": None,
+        "task_type": "CALL",
+        "priority": "MEDIUM",
+        "status": "OPEN",
+        "due_at": "2026-09-10T12:00:00+00:00",
+        "completed_at": None,
+        "cancelled_at": None,
+        "completion_notes": None,
+        "cancellation_reason": None,
+        "recommendation_key": None,
+        "recommendation_context": None,
+        "created_at": "2026-09-09T12:00:00+00:00",
+        "updated_at": "2026-09-09T12:00:00+00:00",
+    })
+
+    assert response.due_at.tzinfo is not None
+    assert response.due_at == datetime(2026, 9, 10, 12, tzinfo=timezone.utc)
 
 
 def test_next_action_dedup_context_and_fresh_evaluation(work):

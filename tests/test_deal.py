@@ -175,6 +175,27 @@ def test_noop_invalid_stage_and_explicit_updates(flow):
     assert len(client.get(path + "/history").json()) == 1
 
 
+def test_transition_rejects_stage_from_another_organization(flow):
+    client = flow["client"]
+    deal = create(flow)
+    other_org = post(client, "/organizations/", {
+        "org_code": "OTHERORG", "legal_name": "Other organization", "org_type": "PVT_LTD",
+        "subscription_tier": "FREE", "status": "ACTIVE",
+    })
+    other_stage = post(client, "/deal-pipeline-stages/", {
+        "organization_id": other_org["id"], "stage_key": "OTHER", "stage_name": "Other", "stage_order": 0,
+    })
+
+    response = client.post(
+        f"/deals/{deal['id']}/transition",
+        json={"to_stage_id": other_stage["id"]},
+    )
+
+    assert response.status_code == 409
+    assert client.get(f"/deals/{deal['id']}").json()["stage_id"] == deal["stage_id"]
+    assert len(client.get(f"/deals/{deal['id']}/history").json()) == 1
+
+
 @pytest.mark.parametrize("boundary", ["requirement_lead", "match_lead", "match_requirement"])
 def test_cross_opportunity_boundaries_in_service_and_api(flow, boundary):
     db, client = flow["db"], flow["client"]

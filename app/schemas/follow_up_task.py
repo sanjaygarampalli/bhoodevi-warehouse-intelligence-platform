@@ -79,7 +79,11 @@ class FollowUpTaskResponse(BaseModel):
     updated_at: datetime
     is_overdue: bool = False
 
-    @field_validator("due_at", "completed_at", "cancelled_at", "created_at", "updated_at")
+    @field_validator("due_at", "completed_at", "cancelled_at", "created_at", "updated_at", mode="before")
     @classmethod
     def normalize_timestamps(cls, value):
-        return as_utc(value) if value is not None else None
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        return as_utc(value)
