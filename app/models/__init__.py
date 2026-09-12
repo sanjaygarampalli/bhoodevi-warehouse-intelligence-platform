@@ -42,6 +42,18 @@ from app.models.requirement import (
     WarehouseType,
 )
 from app.models.lead_score_snapshot import LeadScoreSnapshot
+from app.models.market_signal import (
+    DemandStrength,
+    EvidenceCredibility,
+    MarketSignal,
+    MarketSignalConfidence,
+    MarketSignalEvidence,
+    MarketSignalSourceType,
+    MarketSignalStatus,
+    MarketSignalType,
+    RequirementCandidate,
+    RequirementCandidateStatus,
+)
 from app.models.user import User
 from app.models.warehouse import AvailabilityStatus, Warehouse
 from app.models.warehouse_match import (
@@ -79,6 +91,16 @@ __all__ = [
     "SubscriptionTier",
     "Lead",
     "LeadScoreSnapshot",
+    "DemandStrength",
+    "EvidenceCredibility",
+    "MarketSignal",
+    "MarketSignalConfidence",
+    "MarketSignalEvidence",
+    "MarketSignalSourceType",
+    "MarketSignalStatus",
+    "MarketSignalType",
+    "RequirementCandidate",
+    "RequirementCandidateStatus",
     "LeadActivity",
     "LeadPriority",
     "LeadSource",

@@ -57,3 +57,17 @@ Desktop.ini
 # Local databases
 *.db
 *.sqlite3
+
+# Local database backups and dumps
+*.backup
+*.dump
+
+# Developer-local tooling and temporary audit artifacts
+.claude/
+llm7-codex-proxy/
+_append_*.py
+temp_*.py
+groq_test.py
+
+# Accidental command/output artifact
+industry.py* -RawGet-Content*

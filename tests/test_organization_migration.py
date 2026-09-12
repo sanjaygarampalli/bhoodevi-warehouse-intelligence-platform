@@ -41,7 +41,7 @@ def test_migration_chain_has_one_connected_head():
     config = Config()
     config.set_main_option("script_location", str(VERSIONS.parent))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["l7d8e9f0a1b2"]
+    assert scripts.get_heads() == ["m8e9f0a1b2c3"]
     revisions = list(scripts.walk_revisions())
     assert len(revisions) == len(list(VERSIONS.glob("*.py")))
     for child, parent in zip(revisions, revisions[1:]):
@@ -59,10 +59,11 @@ def test_company_ownership_migration_matches_metadata():
     )
     migration.op = Operations(MigrationContext.configure(engine))
     migration.upgrade()
-    assert "ADD COLUMN organization_id INTEGER NOT NULL" in statements[0]
-    assert "CREATE INDEX ix_companies__organization_id" in statements[1]
-    assert "CONSTRAINT fk_companies__organization_id" in statements[2]
-    assert "REFERENCES organizations (id) ON DELETE RESTRICT" in statements[2]
+    assert "ADD COLUMN organization_id INTEGER" in statements[0]
+    assert "ALTER TABLE companies ALTER COLUMN organization_id SET NOT NULL" in statements[2]
+    assert "CREATE INDEX ix_companies__organization_id" in statements[3]
+    assert "CONSTRAINT fk_companies__organization_id" in statements[4]
+    assert "REFERENCES organizations (id) ON DELETE RESTRICT" in statements[4]
     column = Company.__table__.c.organization_id
     assert column.nullable is False
     ownership_indexes = [

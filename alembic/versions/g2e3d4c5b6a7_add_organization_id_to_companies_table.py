@@ -25,8 +25,83 @@ def upgrade() -> None:
         sa.Column(
             "organization_id",
             sa.Integer(),
-            nullable=False,
+            nullable=True,
         ),
+    )
+
+    # Existing installations already contain companies. Assign those legacy
+    # rows to one deterministic, valid organization before enforcing the
+    # organization-scoped schema. The DO block is also emitted by offline SQL
+    # generation, while the data-dependent checks execute on PostgreSQL.
+    op.execute(
+        sa.text(
+            """
+            DO $$
+            DECLARE
+                legacy_organization_id INTEGER;
+            BEGIN
+                SELECT id
+                INTO legacy_organization_id
+                FROM organizations
+                WHERE org_code = 'LEGACY'
+                LIMIT 1;
+
+                IF legacy_organization_id IS NULL THEN
+                    INSERT INTO organizations (
+                        public_id,
+                        org_code,
+                        legal_name,
+                        org_type,
+                        subscription_tier,
+                        status,
+                        country
+                    )
+                    VALUES (
+                        '00000000-0000-0000-0000-000000000001',
+                        'LEGACY',
+                        'Legacy Companies Organization',
+                        'OTHER'::orgtype,
+                        'FREE'::subscriptiontier,
+                        'ACTIVE'::organizationstatus,
+                        'India'
+                    )
+                    ON CONFLICT DO NOTHING;
+
+                    SELECT id
+                    INTO legacy_organization_id
+                    FROM organizations
+                    WHERE org_code = 'LEGACY'
+                       OR public_id = '00000000-0000-0000-0000-000000000001'
+                    ORDER BY (org_code = 'LEGACY') DESC
+                    LIMIT 1;
+                END IF;
+
+                IF legacy_organization_id IS NULL THEN
+                    RAISE EXCEPTION
+                        'Unable to obtain a valid legacy organization for companies';
+                END IF;
+
+                UPDATE companies
+                SET organization_id = legacy_organization_id
+                WHERE organization_id IS NULL;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM companies
+                    WHERE organization_id IS NULL
+                ) THEN
+                    RAISE EXCEPTION
+                        'Companies organization_id backfill left NULL values';
+                END IF;
+            END $$;
+            """
+        )
+    )
+    op.alter_column(
+        "companies",
+        "organization_id",
+        existing_type=sa.Integer(),
+        nullable=False,
     )
     op.create_index(
         op.f("ix_companies__organization_id"),

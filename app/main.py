@@ -6,6 +6,16 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.services.deal_workflow import DealConflict, DealNotFound
 from app.services.follow_up_workflow import TaskConflict, TaskNotFound
+from app.services.market_signal_intelligence import (
+    CandidateAlreadyExists,
+    CandidateNotEligible,
+    EvidenceNotFound,
+    InvalidCompanyOrganization,
+    InvalidStatusTransition,
+    MarketSignalConflict,
+    MarketSignalNotFound,
+    RequirementCandidateNotFound,
+)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -28,3 +38,23 @@ async def deal_conflict_handler(request, exc):
 @app.exception_handler(TaskNotFound)
 async def deal_not_found_handler(request, exc):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(MarketSignalNotFound)
+@app.exception_handler(EvidenceNotFound)
+@app.exception_handler(RequirementCandidateNotFound)
+async def market_signal_not_found_handler(request, exc):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(InvalidStatusTransition)
+@app.exception_handler(InvalidCompanyOrganization)
+@app.exception_handler(CandidateNotEligible)
+async def market_signal_bad_request_handler(request, exc):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(MarketSignalConflict)
+@app.exception_handler(CandidateAlreadyExists)
+async def market_signal_conflict_handler(request, exc):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})

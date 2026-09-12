@@ -18,6 +18,8 @@ from app.api.v1.endpoints.prospect_prioritization import router as prospect_prio
 from app.api.v1.endpoints.operational_dashboard import router as operational_dashboard_router
 from app.api.v1.endpoints.action_intelligence import router as action_intelligence_router
 from app.api.v1.endpoints.organization_membership import router as organization_membership_router
+from app.api.v1.endpoints.market_signal import candidate_router as requirement_candidate_router
+from app.api.v1.endpoints.market_signal import router as market_signal_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -59,3 +61,5 @@ router.include_router(prospect_prioritization_router)
 router.include_router(operational_dashboard_router)
 router.include_router(action_intelligence_router)
 router.include_router(organization_membership_router)
+router.include_router(market_signal_router)
+router.include_router(requirement_candidate_router)

@@ -92,3 +92,11 @@ engine or persistence model.
 the explicit user-to-organization membership model, organization roles, centralized
 authorization dependencies, membership API, and organization-aware intelligence
 scoping foundation.
+
+## Market Signal Intelligence Foundation
+
+[Market Signal Intelligence](architecture/MARKET_SIGNAL_INTELLIGENCE.md) documents
+the upstream evidence domain for organization-scoped market signals, source
+evidence, deterministic warehouse-demand assessment, and human-reviewed
+requirement candidates. It does not duplicate lead/prospect/action scoring and does
+not automatically create requirements, leads, or companies.
