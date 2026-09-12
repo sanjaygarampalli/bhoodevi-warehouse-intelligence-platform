@@ -100,3 +100,7 @@ the upstream evidence domain for organization-scoped market signals, source
 evidence, deterministic warehouse-demand assessment, and human-reviewed
 requirement candidates. It does not duplicate lead/prospect/action scoring and does
 not automatically create requirements, leads, or companies.
+
+## Company Intelligence & Lead Discovery Foundation
+
+[Company Intelligence](architecture/COMPANY_INTELLIGENCE.md) documents the organization-scoped warehouse relevance, contact intelligence, deterministic ICP/opportunity scoring, transparent explanations, and next-best-action foundation.

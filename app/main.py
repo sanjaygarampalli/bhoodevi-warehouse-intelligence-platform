@@ -16,6 +16,16 @@ from app.services.market_signal_intelligence import (
     MarketSignalNotFound,
     RequirementCandidateNotFound,
 )
+from app.services.company_intelligence import (
+    CompanyContactMethodNotFound,
+    CompanyContactNotFound,
+    CompanyIntelligenceNotFound,
+    CompanyIntelligenceOrganizationError,
+    CompanyWarehouseProfileNotFound,
+    DuplicateContactMethod,
+    DuplicateIntelligenceProfile,
+    InvalidContactMethodValue,
+)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -58,3 +68,24 @@ async def market_signal_bad_request_handler(request, exc):
 @app.exception_handler(CandidateAlreadyExists)
 async def market_signal_conflict_handler(request, exc):
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+@app.exception_handler(CompanyIntelligenceNotFound)
+@app.exception_handler(CompanyContactNotFound)
+@app.exception_handler(CompanyContactMethodNotFound)
+@app.exception_handler(CompanyWarehouseProfileNotFound)
+async def company_intelligence_not_found_handler(request, exc):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+@app.exception_handler(CompanyIntelligenceOrganizationError)
+async def company_intelligence_bad_request_handler(request, exc):
+    return JSONResponse(status_code=404, content={"detail": "Resource not found"})
+
+@app.exception_handler(DuplicateContactMethod)
+@app.exception_handler(DuplicateIntelligenceProfile)
+async def company_intelligence_conflict_handler(request, exc):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(InvalidContactMethodValue)
+async def company_intelligence_validation_handler(request, exc):
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
