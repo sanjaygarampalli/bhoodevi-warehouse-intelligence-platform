@@ -59,6 +59,11 @@ from app.models.user import User
 from app.models.warehouse import AvailabilityStatus, Warehouse
 from app.models.warehouse_capability import CapabilityStatus, WarehouseCapabilityProfile
 from app.models.warehouse_requirement import CompanyWarehouseRequirementProfile
+from app.models.warehouse_pilot import (
+    ListingStatus, MaintenanceChargeType, OperationalStatus, RequirementConfidence,
+    RequirementFlexibility, ValidationStatus, WarehouseCommercialProfile,
+    WarehouseOperationalProfile, WarehouseRequirementAssessment,
+)
 from app.models.warehouse_match import (
     MatchedBy,
     WarehouseMatch,
@@ -121,4 +126,13 @@ __all__ = [
     "CapabilityStatus",
     "WarehouseCapabilityProfile",
     "CompanyWarehouseRequirementProfile",
+    "ListingStatus",
+    "MaintenanceChargeType",
+    "OperationalStatus",
+    "RequirementConfidence",
+    "RequirementFlexibility",
+    "ValidationStatus",
+    "WarehouseCommercialProfile",
+    "WarehouseOperationalProfile",
+    "WarehouseRequirementAssessment",
 ]

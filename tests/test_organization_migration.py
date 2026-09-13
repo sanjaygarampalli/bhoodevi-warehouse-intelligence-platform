@@ -41,9 +41,11 @@ def test_migration_chain_has_one_connected_head():
     config = Config()
     config.set_main_option("script_location", str(VERSIONS.parent))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["o0a1b2c3d4e5"]
+    heads = scripts.get_heads()
+    assert len(heads) == 1
     revisions = list(scripts.walk_revisions())
     assert len(revisions) == len(list(VERSIONS.glob("*.py")))
+    assert revisions[0].revision == heads[0]
     for child, parent in zip(revisions, revisions[1:]):
         assert child.down_revision == parent.revision
     assert revisions[-1].down_revision is None
