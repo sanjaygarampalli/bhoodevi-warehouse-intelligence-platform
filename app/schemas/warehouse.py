@@ -14,6 +14,7 @@ class WarehouseBase(BaseModel):
 
 
 class WarehouseCreate(WarehouseBase):
+    organization_id: int | None = Field(default=None, gt=0)
     owner_id: int = Field(..., gt=0)
     warehouse_code: str | None = Field(default=None, max_length=50)
     warehouse_type: WarehouseType | None = None
@@ -40,6 +41,7 @@ class WarehouseCreate(WarehouseBase):
 
 
 class WarehouseUpdate(BaseModel):
+    organization_id: Optional[int] = Field(None, gt=0)
     warehouse_name: Optional[str] = Field(None, max_length=255)
     city: Optional[str] = Field(None, max_length=100)
     state: Optional[str] = Field(None, max_length=100)
@@ -70,6 +72,7 @@ class WarehouseUpdate(BaseModel):
 class WarehouseResponse(WarehouseBase):
     id: int
     owner_id: int
+    organization_id: int | None
     warehouse_code: str | None
     warehouse_type: WarehouseType | None
     total_area_sqft: float | None

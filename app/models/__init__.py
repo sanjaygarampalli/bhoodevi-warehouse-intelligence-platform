@@ -57,6 +57,8 @@ from app.models.market_signal import (
 from app.models.company_intelligence import *
 from app.models.user import User
 from app.models.warehouse import AvailabilityStatus, Warehouse
+from app.models.warehouse_capability import CapabilityStatus, WarehouseCapabilityProfile
+from app.models.warehouse_requirement import CompanyWarehouseRequirementProfile
 from app.models.warehouse_match import (
     MatchedBy,
     WarehouseMatch,
@@ -116,4 +118,7 @@ __all__ = [
     "WarehouseMatch",
     "WarehouseMatchStatus",
     "WarehouseType",
+    "CapabilityStatus",
+    "WarehouseCapabilityProfile",
+    "CompanyWarehouseRequirementProfile",
 ]

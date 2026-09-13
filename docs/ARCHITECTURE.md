@@ -104,3 +104,7 @@ not automatically create requirements, leads, or companies.
 ## Company Intelligence & Lead Discovery Foundation
 
 [Company Intelligence](architecture/COMPANY_INTELLIGENCE.md) documents the organization-scoped warehouse relevance, contact intelligence, deterministic ICP/opportunity scoring, transparent explanations, and next-best-action foundation.
+
+## Warehouse Capability Matching — Module 2
+
+[Warehouse Capability Matching](architecture/WAREHOUSE_CAPABILITY_MATCHING.md) documents the normalized, tenant-scoped capability and requirement profiles added for Module 2. It is separate from the legacy lead `Requirement` matching workflow, which remains backward compatible.

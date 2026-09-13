@@ -1,11 +1,15 @@
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.requirement import WarehouseType
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class AvailabilityStatus(str, enum.Enum):
@@ -19,10 +23,16 @@ class AvailabilityStatus(str, enum.Enum):
 class Warehouse(Base):
     __tablename__ = "warehouses"
     __table_args__ = (
+        Index("ix_warehouses__organization_id", "organization_id"),
         {"sqlite_autoincrement": True},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Nullable only for legacy warehouse rows created before tenant scoping.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
 
     warehouse_name: Mapped[str] = mapped_column(String(255), nullable=False)
 
