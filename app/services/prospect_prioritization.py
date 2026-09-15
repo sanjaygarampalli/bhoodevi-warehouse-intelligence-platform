@@ -583,7 +583,7 @@ def evaluate_opportunity_priority(
                                 reference_id=deal.id, reference_type='deal')
     else:
         action = NextBestAction(action=NextBestActionType.MONITOR, summary='Monitor deal progression.',
-                                reason=f'Deal #{deal.id} is being monitored at stage \'{deal.stage.stage_name if deal.stage else '?'}\'.')
+                                reason=f"Deal #{deal.id} is being monitored at stage '{deal.stage.stage_name if deal.stage else '?'}'.")
 
     return OpportunityPriorityResult(
         deal_id=deal.id,
