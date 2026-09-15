@@ -21,7 +21,8 @@ from app.models import (
     DecisionLevel, DecisionMaker, DecisionMakerStatus, Industry, Lead, LeadActivity,
     LeadPriority, LeadScoreSnapshot, LeadStatus, MatchedBy, MoveInTimeframe, Organization,
     OrganizationStatus, OrgType, Requirement, RequirementStatus, SubscriptionTier,
-    User, Warehouse, WarehouseMatch, WarehouseMatchStatus, WarehouseType,
+    OrganizationMemberRole, OrganizationMembership, User, Warehouse, WarehouseMatch,
+    WarehouseMatchStatus, WarehouseType,
 )
 from app.repositories.lead import LeadRepository
 from app.repositories.lead_score_snapshot import LeadScoreSnapshotRepository
@@ -504,15 +505,25 @@ def test_api_authentication(client, db_session, lead, method, suffix, auth):
 
 
 def test_nonadmin_reads_but_cannot_persist(client, db_session, lead):
-    db_session.add(User(full_name="Reader", email="reader@example.com", hashed_password="unused", role="user"))
+    reader = User(full_name="Reader", email="reader@example.com", hashed_password="unused", role="user")
+    db_session.add(reader)
+    db_session.flush()
+    db_session.add(OrganizationMembership(
+        user_id=reader.id,
+        organization_id=lead.company.organization_id,
+        role=OrganizationMemberRole.MEMBER,
+    ))
     db_session.commit()
     headers = {"Authorization": "Bearer " + create_access_token({"sub": "reader@example.com"})}
     path = f"/leads/{lead.id}/intelligence"
     assert client.get(path, headers=headers).status_code == 200
     assert client.get(path + "/history", headers=headers).status_code == 200
-    assert client.get("/leads/prioritized", headers=headers).status_code == 200
-    assert client.post(path + "/calculate", headers=headers).status_code == 403
-    assert db_session.scalars(select(LeadScoreSnapshot)).all() == []
+    assert client.get(
+        f"/leads/prioritized?organization_id={lead.company.organization_id}",
+        headers=headers,
+    ).status_code == 200
+    assert client.post(path + "/calculate", headers=headers).status_code == 200
+    assert len(db_session.scalars(select(LeadScoreSnapshot)).all()) == 1
 
 
 def test_phase2_component_summaries_and_match_evidence(db_session, quality_lead):

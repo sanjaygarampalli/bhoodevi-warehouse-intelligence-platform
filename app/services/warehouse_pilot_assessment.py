@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,7 +56,10 @@ class WarehousePilotService:
         return db.scalar(select(WarehouseRequirementAssessment).where(WarehouseRequirementAssessment.company_id == company_id, WarehouseRequirementAssessment.organization_id == organization_id))
 
     def save_requirement_assessment(self, db, company_id, organization_id, values, create=False):
-        if not self._company(db, company_id, organization_id): return None
+        company = self._company(db, company_id, organization_id)
+        if not company: return None
+        if values.get("validation_status") == "VALIDATED":
+            values = {**values, "validated_at": datetime.utcnow()}
         assessment = self.get_requirement_assessment(db, company_id, organization_id)
         if assessment is None:
             if not create: return None
@@ -100,9 +106,25 @@ class WarehousePilotService:
         else: readiness = "NOT_READY"; operational_reasons.append(f"Operational status is {operational.operational_status.value}.")
         confidence = captured.requirement_confidence.value if captured else "UNVERIFIED"
         blockers = bool(technical["mandatory_gap"] or commercial_fit == "NOT_SUITABLE" or availability_fit == "NOT_SUITABLE")
-        if blockers: overall = "NOT_SUITABLE"
-        elif technical["classification"] in {"EXCELLENT", "GOOD"} and commercial_fit == "CONFIRMED" and availability_fit == "CONFIRMED" and readiness == "READY": overall = "STRONG_FIT"
-        elif technical["classification"] in {"EXCELLENT", "GOOD"} and readiness in {"REQUIRES_IMPROVEMENT", "PARTIALLY_READY"} or commercial_fit in {"PARTIAL", "UNKNOWN"} or availability_fit in {"PARTIAL", "UNKNOWN"}: overall = "CONDITIONAL_FIT"
+        strong_technical = technical["classification"] in {"EXCELLENT", "GOOD"}
+        readiness_needs_work = readiness in {"REQUIRES_IMPROVEMENT", "PARTIALLY_READY"}
+        incomplete_commercial_fit = commercial_fit in {"PARTIAL", "UNKNOWN"}
+        incomplete_availability_fit = availability_fit in {"PARTIAL", "UNKNOWN"}
+        if blockers:
+            overall = "NOT_SUITABLE"
+        elif (
+            strong_technical
+            and commercial_fit == "CONFIRMED"
+            and availability_fit == "CONFIRMED"
+            and readiness == "READY"
+        ):
+            overall = "STRONG_FIT"
+        elif (
+            (strong_technical and readiness_needs_work)
+            or incomplete_commercial_fit
+            or incomplete_availability_fit
+        ):
+            overall = "CONDITIONAL_FIT"
         elif technical["classification"] in {"EXCELLENT", "GOOD"}: overall = "POTENTIAL_FIT"
         else: overall = "WEAK_FIT"
         explanation = [technical["explanation"], *commercial_reasons, *availability_reasons, *operational_reasons]

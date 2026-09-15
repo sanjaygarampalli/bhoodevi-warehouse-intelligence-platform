@@ -19,6 +19,7 @@ from app.models import (
     Organization,
     OrganizationMemberRole,
     OrganizationMembership,
+    MembershipStatus,
     OrgType,
     OrganizationStatus,
     SubscriptionTier,
@@ -109,6 +110,73 @@ def test_unlinked_signal_can_be_created_and_later_linked(market_context):
     assert updated.json()["company_id"] == company.id
 
 
+def test_viewer_cannot_mutate_signal_evidence_lifecycle_or_candidate(market_context):
+    _, org_one, _, company = market_context
+    manager = client("signal-manager@example.com")
+    viewer = client("signal-viewer@example.com")
+    signal_id = manager.post("/market-signals", json=signal_payload(org_one.id, company.id)).json()["id"]
+
+    assert viewer.patch(f"/market-signals/{signal_id}", json={"title": "Changed"}).status_code == 403
+    assert viewer.post(f"/market-signals/{signal_id}/evidence", json={
+        "evidence_type": "NEWS", "title": "News", "credibility_level": "HIGH",
+    }).status_code == 403
+    assert viewer.post(f"/market-signals/{signal_id}/transition", json={"target_status": "UNDER_REVIEW"}).status_code == 403
+    assert viewer.post(f"/market-signals/{signal_id}/requirement-candidate").status_code == 403
+
+
+def test_inactive_member_cannot_read_or_write_market_signals(market_context):
+    db, org_one, _, company = market_context
+    db.query(OrganizationMembership).filter_by(user_id=3, organization_id=org_one.id).update({"status": MembershipStatus.INACTIVE})
+    db.commit()
+    viewer = client("signal-viewer@example.com")
+
+    assert viewer.get(f"/market-signals?organization_id={org_one.id}").status_code == 403
+    assert viewer.post("/market-signals", json=signal_payload(org_one.id, company.id)).status_code == 403
+
+
+def test_foreign_company_is_rejected_on_signal_create_and_update(market_context):
+    db, org_one, org_two, company = market_context
+    foreign_company = Company(organization_id=org_two.id, company_name="Foreign Logistics", industry="Logistics", company_type="Private")
+    db.add(foreign_company)
+    db.commit()
+    manager = client("signal-manager@example.com")
+
+    assert manager.post("/market-signals", json=signal_payload(org_one.id, foreign_company.id)).status_code == 400
+    signal_id = manager.post("/market-signals", json=signal_payload(org_one.id, company.id)).json()["id"]
+    assert manager.patch(f"/market-signals/{signal_id}", json={"company_id": foreign_company.id}).status_code == 400
+
+
+def test_evidence_is_owned_through_parent_signal(market_context):
+    _, org_one, _, company = market_context
+    manager = client("signal-manager@example.com")
+    outsider = client("signal-outsider@example.com")
+    signal_id = manager.post("/market-signals", json=signal_payload(org_one.id, company.id)).json()["id"]
+    evidence = manager.post(f"/market-signals/{signal_id}/evidence", json={
+        "evidence_type": "NEWS", "title": "Evidence", "credibility_level": "HIGH",
+    })
+    evidence_id = evidence.json()["id"]
+
+    assert outsider.get(f"/market-signals/{signal_id}/evidence/{evidence_id}").status_code == 403
+    assert outsider.patch(f"/market-signals/{signal_id}/evidence/{evidence_id}", json={"title": "Changed"}).status_code == 403
+
+
+def test_assessment_separates_observation_inference_recommendation_and_confidence(market_context):
+    _, org_one, _, company = market_context
+    http = client("signal-manager@example.com")
+    signal_id = http.post("/market-signals", json=signal_payload(org_one.id, company.id, confidence="HIGH")).json()["id"]
+    http.post(f"/market-signals/{signal_id}/evidence", json={
+        "evidence_type": "COMPANY_ANNOUNCEMENT", "title": "Plant announcement", "excerpt": "Plant announced.", "credibility_level": "PRIMARY",
+    })
+    assessment = http.get(f"/market-signals/{signal_id}/assessment").json()
+
+    assert assessment["observed_evidence"] == ["Plant announcement"]
+    assert assessment["inference"]
+    assert assessment["recommendation"] == assessment["recommended_next_step"]
+    assert assessment["confidence_level"] == "HIGH"
+    assert assessment["demand_strength"] == "STRONG"
+    assert assessment["inference"] != assessment["recommendation"]
+
+
 @pytest.mark.parametrize(("signal_type", "strength"), [
     ("NEW_WAREHOUSE", "STRONG"),
     ("NEW_DISTRIBUTION_CENTER", "STRONG"),
@@ -188,8 +256,12 @@ def test_signal_lifecycle_rejects_patch_and_invalid_reversals(market_context):
     assert db.scalar(select(MarketSignal.status).where(MarketSignal.id == signal_id)) == MarketSignalStatus.DETECTED
     assert http.post(f"/market-signals/{signal_id}/transition", json={"target_status": "UNDER_REVIEW"}).status_code == 200
     assert db.scalar(select(MarketSignal.status).where(MarketSignal.id == signal_id)) == MarketSignalStatus.UNDER_REVIEW
-    assert http.post(f"/market-signals/{signal_id}/transition", json={"target_status": "VERIFIED"}).status_code == 200
+    assert http.post(f"/market-signals/{signal_id}/transition", json={"target_status": "VERIFIED", "review_notes": "Primary source reviewed by manager."}).status_code == 200
     assert db.scalar(select(MarketSignal.status).where(MarketSignal.id == signal_id)) == MarketSignalStatus.VERIFIED
+    reviewed = db.get(MarketSignal, signal_id)
+    assert reviewed.reviewed_by_user_id == 2
+    assert reviewed.reviewed_at is not None
+    assert reviewed.review_notes == "Primary source reviewed by manager."
     assert http.post(f"/market-signals/{signal_id}/transition", json={"target_status": "UNDER_REVIEW"}).status_code == 400
     assert db.scalar(select(MarketSignal.status).where(MarketSignal.id == signal_id)) == MarketSignalStatus.VERIFIED
     assert http.post(f"/market-signals/{signal_id}/transition", json={"target_status": "ARCHIVED"}).status_code == 200

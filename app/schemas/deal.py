@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.deal_pipeline_stage import DealPipelineStageResponse
+from app.models.deal import LostReasonCategory
 
 
 class DealCreate(BaseModel):
@@ -45,6 +46,12 @@ class DealTransition(BaseModel):
 
     to_stage_id: int = Field(gt=0)
     change_reason: str | None = Field(None, max_length=255)
+    lost_reason_category: LostReasonCategory | None = None
+    final_commercial_amount: Decimal | None = Field(None, ge=0, max_digits=16, decimal_places=2)
+    final_commercial_currency: str | None = Field(None, pattern=r"^[A-Z]{3}$")
+    final_lease_duration_months: int | None = Field(None, gt=0)
+    outcome_notes: str | None = Field(None, max_length=5000)
+    closure_evidence_reference: str | None = Field(None, max_length=255)
 
 
 class DealResponse(DealCreate):
@@ -57,6 +64,12 @@ class DealResponse(DealCreate):
     deal_status: Literal["OPEN", "WON", "LOST"]
     closed_at: datetime | None
     closed_reason: str | None
+    lost_reason_category: LostReasonCategory | None
+    final_commercial_amount: Decimal | None
+    final_commercial_currency: str | None
+    final_lease_duration_months: int | None
+    outcome_notes: str | None
+    closure_evidence_reference: str | None
     created_at: datetime
     updated_at: datetime
 

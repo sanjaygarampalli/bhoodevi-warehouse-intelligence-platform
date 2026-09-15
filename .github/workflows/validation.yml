@@ -1,0 +1,66 @@
+name: BWIP validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: development
+      DEBUG: "True"
+      SECRET_KEY: ci-only-secret-not-for-deployment
+      DATABASE_URL: postgresql+psycopg2://bwip:bwip@localhost:5432/bwip_ci
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: bwip
+          POSTGRES_PASSWORD: bwip
+          POSTGRES_DB: bwip_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bwip -d bwip_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Check installed dependency consistency
+        run: python -m pip check
+
+      - name: Compile application
+        run: python -m compileall -q app
+
+      - name: Validate application import, mappers, and OpenAPI
+        run: |
+          python -c "from app.db.base import Base; import app.models; from app.main import app; spec = app.openapi(); assert len(Base.metadata.tables) > 0; assert '/health' in spec['paths']; assert '/ready' in spec['paths']; print('OpenAPI paths:', len(spec['paths']))"
+
+      - name: Validate Alembic graph
+        run: |
+          test "$(python -m alembic heads | grep -c '(head)')" = "1"
+          python -m alembic branches
+
+      - name: Upgrade fresh PostgreSQL database
+        run: python -m alembic upgrade head
+
+      - name: Verify PostgreSQL migration revision
+        run: test "$(python -m alembic current | awk '{print $1}')" = "r3d4e5f6a7b8"
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Check whitespace errors
+        run: git diff --check

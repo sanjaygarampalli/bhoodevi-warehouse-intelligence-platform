@@ -80,6 +80,9 @@ class MarketSignalResponse(BaseModel):
     announced_investment_currency: str | None
     confidence_level: MarketSignalConfidence
     created_by_user_id: int | None
+    reviewed_by_user_id: int | None
+    reviewed_at: datetime | None
+    review_notes: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -130,6 +133,9 @@ class MarketSignalAssessmentResponse(BaseModel):
     explanation: str
     reasons: list[str]
     recommended_next_step: str
+    observed_evidence: list[str]
+    inference: str
+    recommendation: str
 
 
 class RequirementCandidateResponse(BaseModel):
@@ -163,6 +169,7 @@ class RequirementCandidateUpdate(BaseModel):
 
 class MarketSignalTransition(BaseModel):
     target_status: MarketSignalStatus
+    review_notes: str | None = Field(default=None, max_length=5000)
 
 
 class RequirementCandidateTransition(BaseModel):

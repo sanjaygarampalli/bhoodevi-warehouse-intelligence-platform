@@ -103,6 +103,9 @@ class MarketSignal(Base):
     announced_investment_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     confidence_level: Mapped[MarketSignalConfidence] = mapped_column(Enum(MarketSignalConfidence, name="marketsignalconfidence"), nullable=False, default=MarketSignalConfidence.LOW)
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow, server_default=func.now())
 

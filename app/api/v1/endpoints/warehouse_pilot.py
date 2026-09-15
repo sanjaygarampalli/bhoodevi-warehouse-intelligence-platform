@@ -90,13 +90,18 @@ def get_requirement_assessment(company_id: int, db: Session = Depends(get_db), u
 @router.post("/companies/{company_id}/warehouse-requirement-assessment", response_model=RequirementAssessmentResponse, status_code=status.HTTP_201_CREATED)
 def create_requirement_assessment(company_id: int, data: RequirementAssessmentWrite, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     organization_id = company_org(db, company_id); require_organization_write(db, user, organization_id)
-    return service.save_requirement_assessment(db, company_id, organization_id, values(data), True)
+    payload = values(data)
+    payload["captured_by_user_id"] = user.id
+    return service.save_requirement_assessment(db, company_id, organization_id, payload, True)
 
 
 @router.patch("/companies/{company_id}/warehouse-requirement-assessment", response_model=RequirementAssessmentResponse)
 def update_requirement_assessment(company_id: int, data: RequirementAssessmentWrite, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     organization_id = company_org(db, company_id); require_organization_write(db, user, organization_id)
-    item = service.save_requirement_assessment(db, company_id, organization_id, values(data))
+    payload = values(data)
+    if payload.get("validation_status") == "VALIDATED":
+        payload["validated_by_user_id"] = user.id
+    item = service.save_requirement_assessment(db, company_id, organization_id, payload)
     if item is None: raise HTTPException(404, "Requirement assessment not found")
     return item
 

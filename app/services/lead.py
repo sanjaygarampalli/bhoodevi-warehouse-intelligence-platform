@@ -32,20 +32,33 @@ class LeadService:
             return None
 
         if lead.primary_decision_maker_id is not None:
-            decision_maker = (
-                self.decision_maker_repository.get_by_id(
-                    db,
-                    lead.primary_decision_maker_id,
-                )
+            decision_maker = self.decision_maker_repository.get_by_id(
+                db,
+                lead.primary_decision_maker_id,
             )
-
-            if decision_maker is None:
+            if decision_maker is None or decision_maker.company_id != company.id:
                 return None
 
         db_lead = Lead(
             **lead.model_dump()
         )
         return self.repository.create(db, db_lead)
+
+    def create_lead_in_transaction(self, db: Session, lead: LeadCreate) -> Lead | None:
+        """Create a lead without committing; callers own the transaction."""
+        company = self.company_repository.get_by_id(db, lead.company_id)
+        if company is None:
+            return None
+        if lead.primary_decision_maker_id is not None:
+            decision_maker = self.decision_maker_repository.get_by_id(
+                db, lead.primary_decision_maker_id,
+            )
+            if decision_maker is None or decision_maker.company_id != company.id:
+                return None
+        db_lead = Lead(**lead.model_dump())
+        db.add(db_lead)
+        db.flush()
+        return db_lead
 
     def get_lead_by_id(
         self,
@@ -80,6 +93,20 @@ class LeadService:
         if "company_id" in update_data and update_data["company_id"] != db_lead.company_id:
             protect_task_reference(db, "lead", lead_id)
             protect_deal_reference(db, "lead", lead_id)
+
+        company_id = update_data.get("company_id", db_lead.company_id)
+        company = self.company_repository.get_by_id(db, company_id)
+        if company is None:
+            return None
+        decision_maker_id = update_data.get(
+            "primary_decision_maker_id", db_lead.primary_decision_maker_id,
+        )
+        if decision_maker_id is not None:
+            decision_maker = self.decision_maker_repository.get_by_id(
+                db, decision_maker_id,
+            )
+            if decision_maker is None or decision_maker.company_id != company.id:
+                return None
 
         for key, value in update_data.items():
             setattr(db_lead, key, value)

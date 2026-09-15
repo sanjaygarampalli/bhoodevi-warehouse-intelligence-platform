@@ -11,6 +11,7 @@ from app.schemas.decision_maker import (
     DecisionMakerUpdate,
 )
 from app.services.decision_maker import DecisionMakerService
+from app.services.organization_access import require_organization_access, require_organization_write, organization_for_company
 
 router = APIRouter(
     prefix="/decision-makers",
@@ -24,8 +25,12 @@ decision_maker_service = DecisionMakerService()
 def create_new_decision_maker(
     decision_maker: DecisionMakerCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    organization_id = organization_for_company(db, decision_maker.company_id)
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    require_organization_write(db, current_user, organization_id)
     created = decision_maker_service.create_decision_maker(
         db,
         decision_maker,
@@ -46,6 +51,10 @@ def read_decision_makers_by_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    organization_id = organization_for_company(db, company_id)
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    require_organization_access(db, current_user, organization_id)
     return decision_maker_service.list_decision_makers_by_company(
         db,
         company_id,
@@ -69,6 +78,8 @@ def read_decision_maker(
             detail="Decision maker not found",
         )
 
+    require_organization_access(db, current_user, organization_for_company(db, decision_maker.company_id))
+
     return decision_maker
 
 
@@ -77,8 +88,12 @@ def update_existing_decision_maker(
     decision_maker_id: int,
     decision_maker: DecisionMakerUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    existing = decision_maker_service.get_decision_maker_by_id(db, decision_maker_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Decision maker not found")
+    require_organization_write(db, current_user, organization_for_company(db, existing.company_id))
     updated = decision_maker_service.update_decision_maker(
         db,
         decision_maker_id,
@@ -98,8 +113,12 @@ def update_existing_decision_maker(
 def delete_existing_decision_maker(
     decision_maker_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    existing = decision_maker_service.get_decision_maker_by_id(db, decision_maker_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Decision maker not found")
+    require_organization_write(db, current_user, organization_for_company(db, existing.company_id))
     deleted = decision_maker_service.delete_decision_maker(
         db,
         decision_maker_id,

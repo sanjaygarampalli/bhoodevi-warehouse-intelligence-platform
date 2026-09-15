@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.services.organization_access import require_organization_access
+from app.services.organization_access import organization_for_lead, require_organization_access
 from app.schemas.lead import LeadStatus
 from app.schemas.prospect_prioritization import (
     LeadPriorityListResponse,
@@ -25,6 +25,13 @@ router = APIRouter(
 prioritization_service = ProspectPrioritizationService()
 
 
+def _organization_context(db, current_user, organization_id):
+    if organization_id is None and current_user.role != "admin":
+        raise HTTPException(status_code=400, detail="organization_id is required")
+    if organization_id is not None:
+        require_organization_access(db, current_user, organization_id)
+
+
 @router.get("/dashboard", response_model=PriorityDashboardSummary)
 def read_priority_dashboard(
     organization_id: int | None = Query(default=None, ge=1),
@@ -33,8 +40,7 @@ def read_priority_dashboard(
     current_user: User = Depends(get_current_user),
 ):
     """Return aggregate priority counts and the top leads/opportunities."""
-    if organization_id is not None:
-        require_organization_access(db, current_user, organization_id)
+    _organization_context(db, current_user, organization_id)
     return prioritization_service.dashboard_summary(
         db, organization_id=organization_id, top_n=top_n,
     )
@@ -53,8 +59,7 @@ def list_priority_leads(
     current_user: User = Depends(get_current_user),
 ):
     """Return ranked lead priorities without persisting a snapshot."""
-    if organization_id is not None:
-        require_organization_access(db, current_user, organization_id)
+    _organization_context(db, current_user, organization_id)
     return prioritization_service.list_lead_priorities(
         db,
         limit=limit,
@@ -74,6 +79,10 @@ def read_priority_lead(
     current_user: User = Depends(get_current_user),
 ):
     """Return the deterministic priority evaluation for one lead."""
+    resolved_organization_id = organization_for_lead(db, lead_id)
+    if resolved_organization_id is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    require_organization_access(db, current_user, resolved_organization_id)
     result = prioritization_service.evaluate_lead(db, lead_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -90,8 +99,7 @@ def list_priority_opportunities(
     current_user: User = Depends(get_current_user),
 ):
     """Return ranked deal/opportunity priorities."""
-    if organization_id is not None:
-        require_organization_access(db, current_user, organization_id)
+    _organization_context(db, current_user, organization_id)
     return prioritization_service.list_opportunity_priorities(
         db,
         limit=limit,
@@ -108,6 +116,11 @@ def read_priority_opportunity(
     current_user: User = Depends(get_current_user),
 ):
     """Return the deterministic priority evaluation for one deal."""
+    from app.models.deal import Deal
+    deal = db.get(Deal, deal_id)
+    if deal is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    require_organization_access(db, current_user, deal.organization_id)
     result = prioritization_service.evaluate_opportunity(db, deal_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Opportunity not found")

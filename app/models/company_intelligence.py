@@ -151,8 +151,8 @@ class CompanyIntelligenceProfile(Base):
     is_launching_new_product: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_opening_new_facility: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     indicator_evidence: Mapped[dict[str, Any] | None] = mapped_column(_json_type())
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class CompanyWarehouseProfile(Base):
@@ -173,8 +173,8 @@ class CompanyWarehouseProfile(Base):
     estimated_area_max_sqft: Mapped[float | None] = mapped_column(Numeric(14, 2))
     estimate_confidence: Mapped[EstimateConfidence] = mapped_column(_enum_type(EstimateConfidence, "estimateconfidence"), nullable=False, default=EstimateConfidence.LOW)
     warehouse_requirement_notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     use_cases: Mapped[list["CompanyWarehouseUseCase"]] = relationship(cascade="all, delete-orphan")
 
 
@@ -203,8 +203,8 @@ class CompanyContact(Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     contact_quality_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     contact_quality_explanation: Mapped[dict[str, Any]] = mapped_column(_json_type(), nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     methods: Mapped[list["CompanyContactMethod"]] = relationship(cascade="all, delete-orphan")
 
 
@@ -235,7 +235,7 @@ class CompanyContactMethod(Base):
 
 class CompanyICPAssessment(Base):
     __tablename__ = "company_icp_assessments"
-    __table_args__ = (UniqueConstraint("organization_id", "company_id", name="uq_company_icp_assessment"), CheckConstraint("score >= 0 AND score <= 100", name="ck_company_icp_score"), Index("ix_company_icp_assessments_org_company", "organization_id", "company_id"))
+    __table_args__ = (UniqueConstraint("organization_id", "company_id", name="uq_company_icp_assessments"), CheckConstraint("score >= 0 AND score <= 100", name="ck_company_icp_score"), Index("ix_company_icp_assessments_org_company", "organization_id", "company_id"))
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
@@ -243,12 +243,12 @@ class CompanyICPAssessment(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     classification: Mapped[IcpClassification] = mapped_column(_enum_type(IcpClassification, "icpclassification"), nullable=False)
     factors: Mapped[list[dict[str, Any]]] = mapped_column(_json_type(), nullable=False)
-    calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
 
 class CompanyOpportunityAssessment(Base):
     __tablename__ = "company_opportunity_assessments"
-    __table_args__ = (UniqueConstraint("organization_id", "company_id", name="uq_company_opportunity_assessment"), CheckConstraint("overall_score >= 0 AND overall_score <= 100", name="ck_company_opportunity_score"), CheckConstraint("warehouse_fit_score >= 0 AND warehouse_fit_score <= 100", name="ck_company_opportunity_warehouse_fit"), CheckConstraint("demand_score >= 0 AND demand_score <= 100", name="ck_company_opportunity_demand"), CheckConstraint("geographic_score >= 0 AND geographic_score <= 100", name="ck_company_opportunity_geography"), CheckConstraint("contact_score >= 0 AND contact_score <= 100", name="ck_company_opportunity_contact"), Index("ix_company_opportunity_assessments_org_company", "organization_id", "company_id"))
+    __table_args__ = (UniqueConstraint("organization_id", "company_id", name="uq_company_opportunity_assessments"), CheckConstraint("overall_score >= 0 AND overall_score <= 100", name="ck_company_opportunity_score"), CheckConstraint("warehouse_fit_score >= 0 AND warehouse_fit_score <= 100", name="ck_company_opportunity_warehouse_fit"), CheckConstraint("demand_score >= 0 AND demand_score <= 100", name="ck_company_opportunity_demand"), CheckConstraint("geographic_score >= 0 AND geographic_score <= 100", name="ck_company_opportunity_geography"), CheckConstraint("contact_score >= 0 AND contact_score <= 100", name="ck_company_opportunity_contact"), Index("ix_company_opportunity_assessments_org_company", "organization_id", "company_id"))
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
@@ -260,7 +260,7 @@ class CompanyOpportunityAssessment(Base):
     geographic_score: Mapped[int] = mapped_column(Integer, nullable=False)
     contact_score: Mapped[int] = mapped_column(Integer, nullable=False)
     explanation: Mapped[dict[str, Any]] = mapped_column(_json_type(), nullable=False)
-    calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())
 
 
 class CompanyNextBestAction(Base):
@@ -272,4 +272,4 @@ class CompanyNextBestAction(Base):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
     action: Mapped[NextBestActionType] = mapped_column(_enum_type(NextBestActionType, "nextbestactiontype"), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
-    calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    calculated_at: Mapped[datetime | None] = mapped_column(DateTime, server_default=func.now())

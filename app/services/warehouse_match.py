@@ -332,7 +332,7 @@ class WarehouseMatchService:
                 db,
                 match_data.requirement_id,
             )
-            if requirement is None:
+            if requirement is None or requirement.lead_id != lead.id:
                 return None
 
         db_match = WarehouseMatch(**match_data.model_dump())
@@ -410,6 +410,15 @@ class WarehouseMatchService:
             lead = self.lead_repository.get_by_id(db, update_data["lead_id"])
             if lead is None:
                 return None
+        lead_id = update_data.get("lead_id", db_match.lead_id)
+        lead = self.lead_repository.get_by_id(db, lead_id)
+        if lead is None:
+            return None
+        effective_requirement_id = update_data.get("requirement_id", db_match.requirement_id)
+        if effective_requirement_id is not None:
+            requirement = self.requirement_repository.get_by_id(db, effective_requirement_id)
+            if requirement is None or requirement.lead_id != lead.id:
+                return None
 
         if "warehouse_id" in update_data and update_data["warehouse_id"] != db_match.warehouse_id:
             warehouse = self.warehouse_repository.get_by_id(
@@ -429,6 +438,8 @@ class WarehouseMatchService:
                     requirement_id,
                 )
                 if requirement is None:
+                    return None
+                if requirement.lead_id != lead.id:
                     return None
                 db_match.requirement_id = requirement_id
 

@@ -55,7 +55,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('organization_id', 'warehouse_id', name='uq_warehouse_commercial_profile_org_warehouse')
     )
-    op.create_index('ix_warehouse_commercial_profiles__warehouse_id', 'warehouse_commercial_profiles', ['warehouse_id'], unique=False)
     op.create_index(op.f('ix_warehouse_commercial_profiles_organization_id'), 'warehouse_commercial_profiles', ['organization_id'], unique=False)
     op.create_index(op.f('ix_warehouse_commercial_profiles_warehouse_id'), 'warehouse_commercial_profiles', ['warehouse_id'], unique=False)
     op.create_table('warehouse_operational_profiles',
@@ -135,7 +134,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('organization_id', 'warehouse_id', name='uq_warehouse_operational_profile_org_warehouse')
     )
-    op.create_index('ix_warehouse_operational_profiles__warehouse_id', 'warehouse_operational_profiles', ['warehouse_id'], unique=False)
     op.create_index(op.f('ix_warehouse_operational_profiles_organization_id'), 'warehouse_operational_profiles', ['organization_id'], unique=False)
     op.create_index(op.f('ix_warehouse_operational_profiles_warehouse_id'), 'warehouse_operational_profiles', ['warehouse_id'], unique=False)
     op.create_table('warehouse_requirement_assessments',
@@ -178,210 +176,77 @@ def upgrade() -> None:
     op.create_index(op.f('ix_warehouse_requirement_assessments_captured_by_user_id'), 'warehouse_requirement_assessments', ['captured_by_user_id'], unique=False)
     op.create_index(op.f('ix_warehouse_requirement_assessments_company_id'), 'warehouse_requirement_assessments', ['company_id'], unique=False)
     op.create_index(op.f('ix_warehouse_requirement_assessments_organization_id'), 'warehouse_requirement_assessments', ['organization_id'], unique=False)
-    op.alter_column('company_contacts', 'contact_quality_explanation',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=False,
-               existing_server_default=sa.text("'{}'::json"))
-    op.alter_column('company_contacts', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_contacts', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_icp_assessments', 'factors',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=False)
-    op.alter_column('company_icp_assessments', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_constraint(op.f('uq_company_icp_assessments'), 'company_icp_assessments', type_='unique')
-    op.create_unique_constraint('uq_company_icp_assessment', 'company_icp_assessments', ['organization_id', 'company_id'])
-    op.alter_column('company_intelligence_profiles', 'operational_geography',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=True)
-    op.alter_column('company_intelligence_profiles', 'indicator_evidence',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=True)
-    op.alter_column('company_intelligence_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_intelligence_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_next_best_actions', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_opportunity_assessments', 'explanation',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=False)
-    op.alter_column('company_opportunity_assessments', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_constraint(op.f('uq_company_opportunity_assessments'), 'company_opportunity_assessments', type_='unique')
-    op.create_unique_constraint('uq_company_opportunity_assessment', 'company_opportunity_assessments', ['organization_id', 'company_id'])
-    op.alter_column('company_warehouse_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_requirement_profiles', 'requirements',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=False)
-    op.alter_column('company_warehouse_requirement_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_requirement_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_company_warehouse_requirement_profiles__company_id'), table_name='company_warehouse_requirement_profiles')
-    op.drop_index(op.f('ix_company_warehouse_requirement_profiles__organization_id'), table_name='company_warehouse_requirement_profiles')
-    op.create_index(op.f('ix_company_warehouse_requirement_profiles_company_id'), 'company_warehouse_requirement_profiles', ['company_id'], unique=False)
-    op.create_index(op.f('ix_company_warehouse_requirement_profiles_organization_id'), 'company_warehouse_requirement_profiles', ['organization_id'], unique=False)
-    op.alter_column('warehouse_capability_profiles', 'capabilities',
-               existing_type=postgresql.JSON(astext_type=sa.Text()),
-               type_=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               existing_nullable=False)
-    op.alter_column('warehouse_capability_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('warehouse_capability_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False,
-               existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_warehouse_capability_profiles__organization_id'), table_name='warehouse_capability_profiles')
-    op.drop_index(op.f('ix_warehouse_capability_profiles__warehouse_id'), table_name='warehouse_capability_profiles')
-    op.create_index(op.f('ix_warehouse_capability_profiles_organization_id'), 'warehouse_capability_profiles', ['organization_id'], unique=False)
-    op.create_index(op.f('ix_warehouse_capability_profiles_warehouse_id'), 'warehouse_capability_profiles', ['warehouse_id'], unique=False)
-    op.create_index(op.f('ix_warehouses_organization_id'), 'warehouses', ['organization_id'], unique=False)
-    # ### end Alembic commands ###
-
-
+    for name, table, condition in (
+        ('ck_warehouse_commercial_profiles__available_area', 'warehouse_commercial_profiles', 'available_area_sqft IS NULL OR available_area_sqft >= 0'),
+        ('ck_warehouse_commercial_profiles__minimum_area', 'warehouse_commercial_profiles', 'minimum_leasable_area_sqft IS NULL OR minimum_leasable_area_sqft >= 0'),
+        ('ck_warehouse_commercial_profiles__maximum_area', 'warehouse_commercial_profiles', 'maximum_leasable_area_sqft IS NULL OR maximum_leasable_area_sqft >= 0'),
+        ('ck_warehouse_commercial_profiles__area_range', 'warehouse_commercial_profiles', 'minimum_leasable_area_sqft IS NULL OR maximum_leasable_area_sqft IS NULL OR minimum_leasable_area_sqft <= maximum_leasable_area_sqft'),
+        ('ck_warehouse_commercial_profiles__minimum_lease', 'warehouse_commercial_profiles', 'lease_term_min_months IS NULL OR lease_term_min_months >= 0'),
+        ('ck_warehouse_commercial_profiles__maximum_lease', 'warehouse_commercial_profiles', 'lease_term_max_months IS NULL OR lease_term_max_months >= 0'),
+        ('ck_warehouse_commercial_profiles__lease_range', 'warehouse_commercial_profiles', 'lease_term_min_months IS NULL OR lease_term_max_months IS NULL OR lease_term_min_months <= lease_term_max_months'),
+        ('ck_warehouse_commercial_profiles__rent_per_sqft', 'warehouse_commercial_profiles', 'expected_rent_per_sqft IS NULL OR expected_rent_per_sqft >= 0'),
+        ('ck_warehouse_commercial_profiles__monthly_rent', 'warehouse_commercial_profiles', 'expected_monthly_rent IS NULL OR expected_monthly_rent >= 0'),
+        ('ck_warehouse_commercial_profiles__deposit', 'warehouse_commercial_profiles', 'security_deposit_months IS NULL OR security_deposit_months >= 0'),
+        ('ck_warehouse_commercial_profiles__escalation', 'warehouse_commercial_profiles', 'escalation_percentage IS NULL OR escalation_percentage >= 0'),
+        ('ck_warehouse_commercial_profiles__escalation_frequency', 'warehouse_commercial_profiles', 'escalation_frequency_months IS NULL OR escalation_frequency_months > 0'),
+        ('ck_warehouse_operational_profiles__year_built', 'warehouse_operational_profiles', 'year_built IS NULL OR year_built BETWEEN 1800 AND 2200'),
+        ('ck_warehouse_operational_profiles__number_of_blocks', 'warehouse_operational_profiles', 'number_of_blocks IS NULL OR number_of_blocks >= 0'),
+        ('ck_warehouse_operational_profiles__number_of_floors', 'warehouse_operational_profiles', 'number_of_floors IS NULL OR number_of_floors >= 0'),
+        ('ck_warehouse_operational_profiles__truck_parking_capacity', 'warehouse_operational_profiles', 'truck_parking_capacity IS NULL OR truck_parking_capacity >= 0'),
+        ('ck_warehouse_operational_profiles__loading_bays_count', 'warehouse_operational_profiles', 'loading_bays_count IS NULL OR loading_bays_count >= 0'),
+        ('ck_warehouse_operational_profiles__dock_levelers_count', 'warehouse_operational_profiles', 'dock_levelers_count IS NULL OR dock_levelers_count >= 0'),
+        ('ck_warehouse_operational_profiles__sanctioned_power_kw', 'warehouse_operational_profiles', 'sanctioned_power_kw IS NULL OR sanctioned_power_kw >= 0'),
+        ('ck_warehouse_operational_profiles__generator_capacity_kva', 'warehouse_operational_profiles', 'generator_capacity_kva IS NULL OR generator_capacity_kva >= 0'),
+        ('ck_warehouse_operational_profiles__forklift_capacity_kg', 'warehouse_operational_profiles', 'forklift_capacity_kg IS NULL OR forklift_capacity_kg >= 0'),
+        ('ck_warehouse_operational_profiles__maximum_rack_height_ft', 'warehouse_operational_profiles', 'maximum_rack_height_ft IS NULL OR maximum_rack_height_ft >= 0'),
+        ('ck_warehouse_requirement_assessments__budget_min', 'warehouse_requirement_assessments', 'budget_min IS NULL OR budget_min >= 0'),
+        ('ck_warehouse_requirement_assessments__budget_max', 'warehouse_requirement_assessments', 'budget_max IS NULL OR budget_max >= 0'),
+        ('ck_warehouse_requirement_assessments__budget_range', 'warehouse_requirement_assessments', 'budget_min IS NULL OR budget_max IS NULL OR budget_min <= budget_max'),
+        ('ck_warehouse_requirement_assessments__rent_per_sqft', 'warehouse_requirement_assessments', 'preferred_rent_per_sqft IS NULL OR preferred_rent_per_sqft >= 0'),
+        ('ck_warehouse_requirement_assessments__city_distance', 'warehouse_requirement_assessments', 'maximum_distance_from_city_km IS NULL OR maximum_distance_from_city_km >= 0'),
+        ('ck_warehouse_requirement_assessments__highway_distance', 'warehouse_requirement_assessments', 'maximum_distance_from_highway_km IS NULL OR maximum_distance_from_highway_km >= 0'),
+    ):
+        op.create_check_constraint(name, table, condition)
 def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_warehouses_organization_id'), table_name='warehouses')
-    op.drop_index(op.f('ix_warehouse_capability_profiles_warehouse_id'), table_name='warehouse_capability_profiles')
-    op.drop_index(op.f('ix_warehouse_capability_profiles_organization_id'), table_name='warehouse_capability_profiles')
-    op.create_index(op.f('ix_warehouse_capability_profiles__warehouse_id'), 'warehouse_capability_profiles', ['warehouse_id'], unique=False)
-    op.create_index(op.f('ix_warehouse_capability_profiles__organization_id'), 'warehouse_capability_profiles', ['organization_id'], unique=False)
-    op.alter_column('warehouse_capability_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('warehouse_capability_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('warehouse_capability_profiles', 'capabilities',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=False)
-    op.drop_index(op.f('ix_company_warehouse_requirement_profiles_organization_id'), table_name='company_warehouse_requirement_profiles')
-    op.drop_index(op.f('ix_company_warehouse_requirement_profiles_company_id'), table_name='company_warehouse_requirement_profiles')
-    op.create_index(op.f('ix_company_warehouse_requirement_profiles__organization_id'), 'company_warehouse_requirement_profiles', ['organization_id'], unique=False)
-    op.create_index(op.f('ix_company_warehouse_requirement_profiles__company_id'), 'company_warehouse_requirement_profiles', ['company_id'], unique=False)
-    op.alter_column('company_warehouse_requirement_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_requirement_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_requirement_profiles', 'requirements',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=False)
-    op.alter_column('company_warehouse_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_warehouse_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.drop_constraint('uq_company_opportunity_assessment', 'company_opportunity_assessments', type_='unique')
-    op.create_unique_constraint(op.f('uq_company_opportunity_assessments'), 'company_opportunity_assessments', ['organization_id', 'company_id'], postgresql_nulls_not_distinct=False)
-    op.alter_column('company_opportunity_assessments', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_opportunity_assessments', 'explanation',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=False)
-    op.alter_column('company_next_best_actions', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_intelligence_profiles', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_intelligence_profiles', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_intelligence_profiles', 'indicator_evidence',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=True)
-    op.alter_column('company_intelligence_profiles', 'operational_geography',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=True)
-    op.drop_constraint('uq_company_icp_assessment', 'company_icp_assessments', type_='unique')
-    op.create_unique_constraint(op.f('uq_company_icp_assessments'), 'company_icp_assessments', ['organization_id', 'company_id'], postgresql_nulls_not_distinct=False)
-    op.alter_column('company_icp_assessments', 'calculated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_icp_assessments', 'factors',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=False)
-    op.alter_column('company_contacts', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_contacts', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True,
-               existing_server_default=sa.text('now()'))
-    op.alter_column('company_contacts', 'contact_quality_explanation',
-               existing_type=sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'),
-               type_=postgresql.JSON(astext_type=sa.Text()),
-               existing_nullable=False,
-               existing_server_default=sa.text("'{}'::json"))
+    """Downgrade Module 3 tables and their indexes."""
+    for name, table in (
+        ('ck_warehouse_requirement_assessments__highway_distance', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_requirement_assessments__city_distance', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_requirement_assessments__rent_per_sqft', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_requirement_assessments__budget_range', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_requirement_assessments__budget_max', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_requirement_assessments__budget_min', 'warehouse_requirement_assessments'),
+        ('ck_warehouse_operational_profiles__maximum_rack_height_ft', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__forklift_capacity_kg', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__generator_capacity_kva', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__sanctioned_power_kw', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__dock_levelers_count', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__loading_bays_count', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__truck_parking_capacity', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__number_of_floors', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__number_of_blocks', 'warehouse_operational_profiles'),
+        ('ck_warehouse_operational_profiles__year_built', 'warehouse_operational_profiles'),
+        ('ck_warehouse_commercial_profiles__escalation_frequency', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__escalation', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__deposit', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__monthly_rent', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__rent_per_sqft', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__lease_range', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__area_range', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__maximum_area', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__minimum_area', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__available_area', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__maximum_lease', 'warehouse_commercial_profiles'),
+        ('ck_warehouse_commercial_profiles__minimum_lease', 'warehouse_commercial_profiles'),
+    ):
+        op.drop_constraint(name, table, type_='check')
     op.drop_index(op.f('ix_warehouse_requirement_assessments_organization_id'), table_name='warehouse_requirement_assessments')
     op.drop_index(op.f('ix_warehouse_requirement_assessments_company_id'), table_name='warehouse_requirement_assessments')
     op.drop_index(op.f('ix_warehouse_requirement_assessments_captured_by_user_id'), table_name='warehouse_requirement_assessments')
     op.drop_table('warehouse_requirement_assessments')
     op.drop_index(op.f('ix_warehouse_operational_profiles_warehouse_id'), table_name='warehouse_operational_profiles')
     op.drop_index(op.f('ix_warehouse_operational_profiles_organization_id'), table_name='warehouse_operational_profiles')
-    op.drop_index('ix_warehouse_operational_profiles__warehouse_id', table_name='warehouse_operational_profiles')
     op.drop_table('warehouse_operational_profiles')
     op.drop_index(op.f('ix_warehouse_commercial_profiles_warehouse_id'), table_name='warehouse_commercial_profiles')
     op.drop_index(op.f('ix_warehouse_commercial_profiles_organization_id'), table_name='warehouse_commercial_profiles')
-    op.drop_index('ix_warehouse_commercial_profiles__warehouse_id', table_name='warehouse_commercial_profiles')
     op.drop_table('warehouse_commercial_profiles')
-    # ### end Alembic commands ###

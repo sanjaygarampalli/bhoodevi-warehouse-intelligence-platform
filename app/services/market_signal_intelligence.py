@@ -143,9 +143,13 @@ class MarketSignalIntelligenceService:
         db.refresh(signal)
         return signal
 
-    def transition_signal(self, db: Session, signal: MarketSignal, target_status: MarketSignalStatus):
+    def transition_signal(self, db: Session, signal: MarketSignal, target_status: MarketSignalStatus, user: User, review_notes: str | None = None):
         self._validate_transition(signal.status, target_status, self.signal_transitions, "market signal")
         signal.status = target_status
+        if target_status in {MarketSignalStatus.VERIFIED, MarketSignalStatus.REJECTED}:
+            signal.reviewed_by_user_id = user.id
+            signal.reviewed_at = datetime.utcnow()
+            signal.review_notes = review_notes
         self._commit(db)
         db.refresh(signal)
         return signal
@@ -176,6 +180,8 @@ class MarketSignalIntelligenceService:
     def assess(self, db: Session, signal: MarketSignal) -> MarketSignalAssessmentResponse:
         evidence = self.list_evidence(db, signal.id)
         if signal.status == MarketSignalStatus.REJECTED:
+            observed = [item.title for item in evidence]
+            recommendation = "Do not create a requirement candidate."
             return MarketSignalAssessmentResponse(
                 market_signal_id=signal.id,
                 indicates_potential_warehouse_demand=False,
@@ -183,7 +189,10 @@ class MarketSignalIntelligenceService:
                 confidence_level=signal.confidence_level,
                 explanation="Rejected market signals do not drive warehouse-demand recommendations.",
                 reasons=["Signal status is REJECTED"],
-                recommended_next_step="Do not create a requirement candidate.",
+                recommended_next_step=recommendation,
+                observed_evidence=observed,
+                inference="The rejected signal is not treated as a warehouse-demand opportunity.",
+                recommendation=recommendation,
             )
         if signal.signal_type in self.strong_types:
             strength = DemandStrength.STRONG
@@ -201,6 +210,8 @@ class MarketSignalIntelligenceService:
             explanation += f" The signal is VERIFIED and supported by {len(evidence)} recorded evidence item(s)."
         elif evidence:
             explanation += f" The signal has {len(evidence)} recorded evidence item(s), but remains {signal.status.value}."
+        observed = [item.title for item in evidence]
+        recommendation = "Review evidence and company linkage before creating a requirement candidate."
         return MarketSignalAssessmentResponse(
             market_signal_id=signal.id,
             indicates_potential_warehouse_demand=strength != DemandStrength.NONE and signal.status != MarketSignalStatus.ARCHIVED,
@@ -208,7 +219,10 @@ class MarketSignalIntelligenceService:
             confidence_level=signal.confidence_level,
             explanation=explanation,
             reasons=[f"Signal type: {signal.signal_type.value}", f"Signal status: {signal.status.value}", f"Evidence items: {len(evidence)}"],
-            recommended_next_step="Review evidence and company linkage before creating a requirement candidate.",
+            recommended_next_step=recommendation,
+            observed_evidence=observed,
+            inference=explanation,
+            recommendation=recommendation,
         )
 
     def create_candidate(self, db: Session, signal: MarketSignal):

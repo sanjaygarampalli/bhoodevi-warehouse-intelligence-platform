@@ -30,6 +30,15 @@ class FollowUpTaskCreate(NextActionTaskCreate):
     priority: LeadPriority = LeadPriority.MEDIUM
 
 
+class DealFollowUpTaskCreate(NextActionTaskCreate):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    subject: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(None, max_length=10000)
+    task_type: TaskType = TaskType.OTHER
+    priority: LeadPriority = LeadPriority.MEDIUM
+
+
 class FollowUpTaskUpdate(TaskInput):
     """Lead/Deal identity, recommendation context and closure are not generic edits."""
     subject: str | None = Field(None, min_length=1, max_length=255)

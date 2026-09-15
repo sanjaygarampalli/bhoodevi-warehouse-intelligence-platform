@@ -14,6 +14,13 @@ from app.schemas.warehouse_match import (
     WarehouseMatchGenerationResponse,
 )
 from app.services.warehouse_match import WarehouseMatchService
+from app.services.organization_access import (
+    organization_for_lead,
+    organization_for_match,
+    organization_for_requirement,
+    require_organization_access,
+    require_organization_write,
+)
 
 router = APIRouter(
     prefix="/warehouse-matches",
@@ -27,8 +34,9 @@ match_service = WarehouseMatchService()
 def generate_warehouse_matches(
     requirement_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_requirement(db, requirement_id))
     """Generate or refresh persisted rule-based matches without replacing reviews."""
     try:
         result = match_service.generate_matches_for_requirement(db, requirement_id)
@@ -46,6 +54,10 @@ def recommend_warehouses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    organization_id = organization_for_requirement(db, requirement_id)
+    if organization_id is None:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    require_organization_access(db, current_user, organization_id)
     """Recalculate ranked recommendations without modifying saved matches."""
     result = match_service.recommend_for_requirement(db, requirement_id, limit=limit)
     if result is None:
@@ -57,8 +69,9 @@ def recommend_warehouses(
 def create_new_warehouse_match(
     match: WarehouseMatchCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, match.lead_id))
     created = match_service.create_match(db, match)
     if created is None:
         raise HTTPException(
@@ -90,6 +103,7 @@ def read_warehouse_matches(
         )
 
     if lead_id is not None:
+        require_organization_access(db, current_user, organization_for_lead(db, lead_id))
         return match_service.list_matches_for_lead(
             db,
             lead_id,
@@ -97,6 +111,11 @@ def read_warehouse_matches(
             offset=offset,
         )
     if warehouse_id is not None:
+        from app.models.warehouse import Warehouse
+        warehouse = db.get(Warehouse, warehouse_id)
+        if warehouse is None:
+            raise HTTPException(status_code=404, detail="Warehouse not found")
+        require_organization_access(db, current_user, warehouse.organization_id)
         return match_service.list_matches_for_warehouse(
             db,
             warehouse_id,
@@ -104,6 +123,7 @@ def read_warehouse_matches(
             offset=offset,
         )
     if requirement_id is not None:
+        require_organization_access(db, current_user, organization_for_requirement(db, requirement_id))
         return match_service.list_matches_for_requirement(
             db,
             requirement_id,
@@ -126,6 +146,7 @@ def read_warehouse_match(
     match = match_service.get_match_by_id(db, match_id)
     if match is None:
         raise HTTPException(status_code=404, detail="Warehouse match not found")
+    require_organization_access(db, current_user, organization_for_match(db, match_id))
     return match
 
 
@@ -134,8 +155,12 @@ def update_existing_warehouse_match(
     match_id: int,
     match: WarehouseMatchUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    existing = match_service.get_match_by_id(db, match_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Warehouse match not found")
+    require_organization_write(db, current_user, organization_for_match(db, match_id))
     updated = match_service.update_match(db, match_id, match)
     if updated is None:
         raise HTTPException(status_code=404, detail="Warehouse match not found")
@@ -146,8 +171,12 @@ def update_existing_warehouse_match(
 def delete_existing_warehouse_match(
     match_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    existing = match_service.get_match_by_id(db, match_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Warehouse match not found")
+    require_organization_write(db, current_user, organization_for_match(db, match_id))
     deleted = match_service.delete_match(db, match_id)
     if deleted is None:
         raise HTTPException(status_code=404, detail="Warehouse match not found")

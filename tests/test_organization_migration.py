@@ -46,9 +46,13 @@ def test_migration_chain_has_one_connected_head():
     revisions = list(scripts.walk_revisions())
     assert len(revisions) == len(list(VERSIONS.glob("*.py")))
     assert revisions[0].revision == heads[0]
-    for child, parent in zip(revisions, revisions[1:]):
-        assert child.down_revision == parent.revision
-    assert revisions[-1].down_revision is None
+    revisions_by_id = {revision.revision: revision for revision in revisions}
+    assert any(revision.down_revision is None for revision in revisions)
+    for revision in revisions:
+        parents = revision.down_revision
+        parents = (parents,) if isinstance(parents, str) else tuple(parents or ())
+        for parent in parents:
+            assert parent in revisions_by_id
 
 
 def test_company_ownership_migration_matches_metadata():

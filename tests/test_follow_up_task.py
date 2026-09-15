@@ -9,7 +9,10 @@ from sqlalchemy.orm import configure_mappers
 
 from app.api.v1.endpoints import follow_up_task as task_api, lead as lead_api
 from app.core.security import create_access_token
-from app.models import Company, Deal, FollowUpTask, Lead, LeadActivity, LeadScoreSnapshot, User
+from app.models import (
+    Company, Deal, FollowUpTask, Lead, LeadActivity, LeadScoreSnapshot,
+    OrganizationMemberRole, OrganizationMembership, User,
+)
 from app.models.follow_up_task import TaskType, as_utc
 from app.schemas.follow_up_task import (
     FollowUpTaskCreate, FollowUpTaskResponse, FollowUpTaskUpdate, NextActionTaskCreate, TaskCancellation, TaskCompletion,
@@ -36,6 +39,12 @@ def work(context, monkeypatch):
         "organization_id": org["id"], "company_name": "Distribution Prospect", "company_type": "Private", "industry": "",
     })
     lead = post(client, "/leads/", {"lead_number": "TASK-1", "company_id": company["id"]})
+    db.add(OrganizationMembership(
+        user_id=2,
+        organization_id=org["id"],
+        role=OrganizationMemberRole.VIEWER,
+    ))
+    db.commit()
     return {"client": client, "db": db, "service": service, "org": org, "company": company, "lead": lead}
 
 
@@ -316,7 +325,7 @@ def test_real_jwt_permissions_on_every_route(work, identity, write_code):
         ("post", f"/leads/{work['lead']['id']}/next-action/task", {"due_at": payload(work)["due_at"]}),
     ]:
         assert client.request(method, url, json=body).status_code == write_code
-    for url in (path, "/follow-up-tasks/", "/follow-up-tasks/?queue=OVERDUE"):
+    for url in (path, f"/follow-up-tasks/?lead_id={work['lead']['id']}", f"/follow-up-tasks/?lead_id={work['lead']['id']}&queue=OVERDUE"):
         assert client.get(url).status_code == (200 if write_code == 403 else 401)
 
 

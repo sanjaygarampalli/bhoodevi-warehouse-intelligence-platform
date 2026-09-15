@@ -56,6 +56,10 @@ class FollowUpTaskService:
     def create_task(self, db, payload: FollowUpTaskCreate):
         data = FollowUpTaskCreate.model_validate(payload.model_dump()).model_dump()
         self._boundaries(db, data["lead_id"], data["deal_id"])
+        if data["deal_id"] is not None:
+            deal = self._reference(db, Deal, data["deal_id"], "Deal")
+            if deal.deal_status != "OPEN":
+                raise TaskConflict("Closed Deals cannot receive follow-up tasks")
         self._assignment(db, data["assigned_to_user_id"])
         now = as_utc(self.clock())
         task = FollowUpTask(**data, created_at=now, updated_at=now)

@@ -634,6 +634,21 @@ class TestWarehouseMatchService:
         assert match is not None
         assert match.requirement_id == requirement.id
 
+    def test_rejects_requirement_from_another_lead(self, db_session, requirement, match_payload, company, user):
+        other_lead = Lead(
+            lead_number="LEAD-OTHER", company_id=company.id,
+            owner_user_id=user.id, status=LeadStatus.NEW, lead_source=LeadSource.MANUAL,
+            priority=LeadPriority.MEDIUM,
+        )
+        db_session.add(other_lead)
+        db_session.commit()
+        match_payload["requirement_id"] = requirement.id
+        match_payload["lead_id"] = other_lead.id
+
+        assert WarehouseMatchService().create_match(
+            db_session, WarehouseMatchCreate(**match_payload),
+        ) is None
+
     def test_get_match_by_id(self, db_session, match_payload):
         service = WarehouseMatchService()
         created = service.create_match(
@@ -786,6 +801,29 @@ class TestWarehouseMatchService:
 
         assert updated is not None
         assert updated.requirement_id is None
+
+    def test_update_match_rejects_requirement_from_another_lead(
+        self, db_session, requirement, match_payload, company, user,
+    ):
+        service = WarehouseMatchService()
+        created = service.create_match(db_session, WarehouseMatchCreate(**match_payload))
+        other_lead = Lead(
+            lead_number="LEAD-OTHER-UPDATE", company_id=company.id,
+            owner_user_id=user.id, status=LeadStatus.NEW, lead_source=LeadSource.MANUAL,
+            priority=LeadPriority.MEDIUM,
+        )
+        db_session.add(other_lead)
+        db_session.commit()
+        other_requirement = Requirement(
+            lead_id=other_lead.id, title="Other lead requirement",
+            requirement_status=RequirementStatus.ACTIVE,
+        )
+        db_session.add(other_requirement)
+        db_session.commit()
+
+        assert service.update_match(
+            db_session, created.id, WarehouseMatchUpdate(requirement_id=other_requirement.id),
+        ) is None
 
     def test_delete_match(self, db_session, match_payload):
         service = WarehouseMatchService()

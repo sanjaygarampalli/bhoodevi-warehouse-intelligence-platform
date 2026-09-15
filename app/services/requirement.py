@@ -33,6 +33,15 @@ class RequirementService:
         )
         return self.repository.create(db, db_requirement)
 
+    def create_requirement_in_transaction(self, db: Session, requirement: RequirementCreate) -> Requirement | None:
+        """Create a requirement without committing; callers own the transaction."""
+        if self.lead_repository.get_by_id(db, requirement.lead_id) is None:
+            return None
+        db_requirement = Requirement(**requirement.model_dump())
+        db.add(db_requirement)
+        db.flush()
+        return db_requirement
+
     def get_requirement_by_id(
         self,
         db: Session,

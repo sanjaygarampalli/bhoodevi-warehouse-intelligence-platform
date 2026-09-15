@@ -31,7 +31,7 @@ class Warehouse(Base):
 
     # Nullable only for legacy warehouse rows created before tenant scoping.
     organization_id: Mapped[int | None] = mapped_column(
-        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True, index=True
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True
     )
 
     warehouse_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -102,8 +102,8 @@ class Warehouse(Base):
     # Ownership
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
     owner: Mapped["User"] = relationship("User", back_populates="warehouses")

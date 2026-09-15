@@ -1,10 +1,17 @@
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.deal import Deal
+    from app.models.decision_maker import DecisionMaker
+    from app.models.lead import Lead
+    from app.models.user import User
 
 
 class ActivityType(str, enum.Enum):
@@ -19,6 +26,8 @@ class ActivityType(str, enum.Enum):
     AI_ACTION = "AI_ACTION"
     SIGNAL = "SIGNAL"
     PROPOSAL = "PROPOSAL"
+    SITE_VISIT = "SITE_VISIT"
+    NEGOTIATION = "NEGOTIATION"
     OTHER = "OTHER"
 
 
@@ -60,12 +69,20 @@ class ActivitySourceType(str, enum.Enum):
 class LeadActivity(Base):
     __tablename__ = "lead_activities"
     __table_args__ = (
+        Index("ix_lead_activities__deal_id__activity_date__id", "deal_id", "activity_date", "id"),
+        Index("ix_lead_activities__decision_maker_id", "decision_maker_id"),
         {"sqlite_autoincrement": True},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     lead_id: Mapped[int] = mapped_column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+
+    deal_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("deals.id", ondelete="RESTRICT"), nullable=True)
+
+    decision_maker_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("decision_makers.id", ondelete="RESTRICT"), nullable=True,
+    )
 
     activity_type: Mapped[ActivityType] = mapped_column(Enum(ActivityType, name="activitytype"), nullable=False, index=True)
 
@@ -97,4 +114,6 @@ class LeadActivity(Base):
 
     # Relationships
     lead: Mapped["Lead"] = relationship("Lead", back_populates="activities")
+    deal: Mapped["Deal | None"] = relationship("Deal")
+    decision_maker: Mapped["DecisionMaker | None"] = relationship("DecisionMaker")
     performed_by_user: Mapped["User | None"] = relationship("User")

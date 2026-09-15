@@ -13,9 +13,9 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models import (
-    AvailabilityStatus, Company, Lead, MatchedBy, Organization, OrganizationStatus,
-    OrgType, Requirement, RequirementStatus, SubscriptionTier, User, Warehouse,
-    WarehouseMatch, WarehouseMatchStatus, WarehouseType,
+    AvailabilityStatus, Company, Lead, MatchedBy, Organization, OrganizationMemberRole,
+    OrganizationMembership, OrganizationStatus, OrgType, Requirement, RequirementStatus,
+    SubscriptionTier, User, Warehouse, WarehouseMatch, WarehouseMatchStatus, WarehouseType,
 )
 from app.services.warehouse_match import WarehouseMatchService, evaluate_warehouse_match
 from app.services.warehouse_matching_rules import WEIGHTS, classify_match
@@ -252,6 +252,11 @@ def saved_requirement(db_session):
     user = User(id=1, full_name="Owner", email="match@example.com", hashed_password="unused", role="user")
     db_session.add_all([lead, user])
     db_session.flush()
+    db_session.add(OrganizationMembership(
+        user_id=user.id,
+        organization_id=org.id,
+        role=OrganizationMemberRole.VIEWER,
+    ))
     req = requirement(lead_id=lead.id)
     db_session.add(req)
     db_session.commit()
@@ -384,7 +389,10 @@ URL = "/warehouse-matches/requirements/1/recommendations"
 
 
 def test_api_auth_and_schema_and_repeatability(client, db_session, saved_requirement):
-    db_session.add_all([warehouse(id=2), warehouse(id=1)])
+    db_session.add_all([
+        warehouse(id=2, organization_id=saved_requirement.lead.company.organization_id),
+        warehouse(id=1, organization_id=saved_requirement.lead.company.organization_id),
+    ])
     db_session.commit()
     assert client.get(URL).status_code == 401
     assert client.get(URL, headers={"Authorization": "Bearer invalid"}).status_code == 401
@@ -415,7 +423,7 @@ def test_api_auth_and_schema_and_repeatability(client, db_session, saved_require
 
 
 def test_existing_saved_match_api_still_exposes_manual_workflow(client, db_session, saved_requirement):
-    db_session.add(warehouse())
+    db_session.add(warehouse(organization_id=saved_requirement.lead.company.organization_id))
     db_session.flush()
     saved = WarehouseMatch(lead_id=1, requirement_id=1, warehouse_id=1, match_score=55,
                            status=WarehouseMatchStatus.SHORTLISTED, matched_by=MatchedBy.MANUAL)

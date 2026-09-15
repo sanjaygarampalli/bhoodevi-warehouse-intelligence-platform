@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -8,10 +8,12 @@ from app.models.user import User
 from app.schemas.company_intelligence import *
 from app.services.company_intelligence import *
 from app.services.organization_access import require_organization_access, require_organization_write
+from app.services.decision_maker_relevance import DecisionMakerRelevanceService
 
 
 router = APIRouter(tags=["Company Intelligence"])
 service = CompanyIntelligenceService()
+decision_maker_relevance_service = DecisionMakerRelevanceService()
 
 
 def organization_for_company(db: Session, company_id: int) -> int:
@@ -30,6 +32,28 @@ def method_or_404(db: Session, method_id: int):
     if method is None:
         raise CompanyContactMethodNotFound("Contact method not found")
     return method
+
+
+@router.get("/companies/decision-maker-priorities", response_model=DecisionMakerQueueResponse)
+def decision_maker_queue(
+    organization_id: int = Query(..., ge=1),
+    company_id: int | None = Query(default=None, ge=1),
+    minimum_relevance: DecisionMakerRelevance | None = None,
+    has_email: bool | None = None,
+    has_phone: bool | None = None,
+    has_linkedin: bool | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    require_organization_access(db, user, organization_id)
+    return decision_maker_relevance_service.queue(db, organization_id, company_id, minimum_relevance, has_email, has_phone, has_linkedin)
+
+
+@router.get("/companies/{company_id}/decision-maker-priorities", response_model=DecisionMakerCompanyAssessmentResponse)
+def decision_maker_priorities(company_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    organization_id = organization_for_company(db, company_id)
+    require_organization_access(db, user, organization_id)
+    return decision_maker_relevance_service.assess_company(db, company_id, organization_id)
 
 
 @router.get("/companies/{company_id}/intelligence")
@@ -85,18 +109,28 @@ def update_warehouse_profile(company_id: int, data: WarehouseProfileUpdate, db: 
 
 
 @router.get("/companies/{company_id}/contacts", response_model=Page)
-def contacts(company_id: int, page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def contacts(company_id: int, page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100), q: str | None = None, job_title: str | None = None, department: ContactDepartment | None = None, seniority: ContactSeniority | None = None, verification_status: VerificationStatus | None = None, has_linkedin: bool | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     organization_id = organization_for_company(db, company_id)
     require_organization_access(db, user, organization_id)
-    items, total = service.list_contacts(db, company_id, organization_id, page, page_size)
+    items, total = service.list_contacts(db, company_id, organization_id, page, page_size, q, job_title, department, seniority, verification_status, has_linkedin)
     return {"items": items, "page": page, "page_size": page_size, "total": total}
+
+
+@router.get("/companies/{company_id}/contact-intelligence", response_model=ContactIntelligenceResponse)
+def contact_intelligence(company_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    organization_id = organization_for_company(db, company_id)
+    require_organization_access(db, user, organization_id)
+    return service.contact_intelligence(db, company_id, organization_id)
 
 
 @router.post("/companies/{company_id}/contacts", response_model=ContactResponse, status_code=status.HTTP_201_CREATED)
 def create_contact(company_id: int, data: ContactWrite, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     organization_id = organization_for_company(db, company_id)
     require_organization_write(db, user, organization_id)
-    return service.add_contact(db, company_id, organization_id, data)
+    try:
+        return service.add_contact(db, company_id, organization_id, data)
+    except (DuplicateContactMethod, InvalidContactMethodValue) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/company-contacts/{contact_id}", response_model=ContactResponse)
@@ -117,7 +151,10 @@ def update_contact(contact_id: int, data: ContactUpdate, db: Session = Depends(g
 def create_method(contact_id: int, data: ContactMethodWrite, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     contact = contact_or_404(db, contact_id)
     require_organization_write(db, user, contact.organization_id)
-    return service.add_method(db, contact_id, contact.organization_id, data)
+    try:
+        return service.add_method(db, contact_id, contact.organization_id, data)
+    except (DuplicateContactMethod, InvalidContactMethodValue) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/company-contact-methods/{method_id}", response_model=ContactMethodResponse)
@@ -133,7 +170,10 @@ def update_method(method_id: int, data: ContactMethodUpdate, db: Session = Depen
     method = method_or_404(db, method_id)
     contact = contact_or_404(db, method.contact_id)
     require_organization_write(db, user, contact.organization_id)
-    return service.update_method(db, method_id, contact.organization_id, data)
+    try:
+        return service.update_method(db, method_id, contact.organization_id, data)
+    except (DuplicateContactMethod, InvalidContactMethodValue) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/companies/{company_id}/icp-assessment", response_model=AssessmentResponse)

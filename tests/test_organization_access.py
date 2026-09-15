@@ -104,6 +104,41 @@ def test_global_admin_can_access_any_organization_context(access_context):
     assert client.get(f"/action-intelligence/summary?organization_id={orgs[1].id}").status_code == 200
 
 
+@pytest.mark.parametrize("path", [
+    "/action-intelligence/summary",
+    "/action-intelligence/actions",
+    "/action-intelligence/today",
+    "/operational-dashboard",
+    "/prospect-prioritization/dashboard",
+    "/prospect-prioritization/leads",
+    "/prospect-prioritization/opportunities",
+])
+def test_non_admin_analytics_require_explicit_organization_context(access_context, path):
+    client = client_for("org-member@example.com")
+    assert client.get(path).status_code == 400
+
+
+def test_non_admin_detail_intelligence_routes_require_record_membership(access_context):
+    db, orgs = access_context
+    from app.models import Company, Lead
+
+    company = Company(
+        organization_id=orgs[1].id,
+        company_name="Private Company",
+        industry="Logistics",
+        company_type="Private",
+    )
+    db.add(company)
+    db.flush()
+    lead = Lead(lead_number="PRIVATE-1", company_id=company.id)
+    db.add(lead)
+    db.commit()
+
+    client = client_for("org-member@example.com")
+    assert client.get(f"/prospect-prioritization/leads/{lead.id}").status_code == 403
+    assert client.get(f"/action-intelligence/leads/{lead.id}").status_code == 403
+
+
 def test_intelligence_context_routes_are_registered(access_context):
     schema = app.openapi()["paths"]
     assert "/organizations/{organization_id}/members" in schema

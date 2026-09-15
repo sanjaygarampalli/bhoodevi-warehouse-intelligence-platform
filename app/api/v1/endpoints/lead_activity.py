@@ -11,6 +11,7 @@ from app.schemas.lead_activity import (
     LeadActivityUpdate,
 )
 from app.services.lead_activity import LeadActivityService
+from app.services.organization_access import organization_for_lead, require_organization_access, require_organization_write
 
 router = APIRouter(
     prefix="/leads/{lead_id}/activities",
@@ -25,8 +26,9 @@ def create_new_lead_activity(
     lead_id: int,
     activity: LeadActivityCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     activity.lead_id = lead_id
     created = lead_activity_service.create_lead_activity(
         db,
@@ -48,6 +50,7 @@ def read_activities_by_lead(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
     return lead_activity_service.list_activities_by_lead(
         db,
         lead_id,
@@ -72,6 +75,8 @@ def read_lead_activity(
             detail="Lead Activity not found",
         )
 
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
+
     return activity
 
 
@@ -81,11 +86,12 @@ def update_existing_lead_activity(
     activity_id: int,
     activity: LeadActivityUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     existing = lead_activity_service.get_lead_activity_by_id(db, activity_id)
     if existing is None or existing.lead_id != lead_id:
         raise HTTPException(status_code=404, detail="Lead Activity not found")
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     if "lead_id" in activity.model_fields_set and activity.lead_id != lead_id:
         raise HTTPException(status_code=400, detail="lead_id must match the URL")
 
@@ -109,11 +115,12 @@ def delete_existing_lead_activity(
     lead_id: int,
     activity_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     existing = lead_activity_service.get_lead_activity_by_id(db, activity_id)
     if existing is None or existing.lead_id != lead_id:
         raise HTTPException(status_code=404, detail="Lead Activity not found")
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
 
     deleted = lead_activity_service.delete_lead_activity(
         db,

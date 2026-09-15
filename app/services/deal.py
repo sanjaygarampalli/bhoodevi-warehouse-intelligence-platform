@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.models.company import Company
-from app.models.deal import Deal
+from app.models.deal import Deal, LostReasonCategory
 from app.models.deal_stage_history import DealStageHistory
 from app.models.lead import Lead
 from app.models.requirement import Requirement
@@ -86,6 +86,26 @@ class DealService:
         deal = Deal(**data, organization_id=organization_id, stage_entered_at=at)
         return self.repository.save(db, deal, self._history(None, stage, changed_by_user_id, at, "Deal created"))
 
+    def create_deal_in_transaction(self, db, payload: DealCreate, changed_by_user_id=None):
+        """Create and flush a Deal while leaving the caller's transaction open."""
+        data = DealCreate.model_validate(payload.model_dump()).model_dump()
+        organization_id = self._boundaries(
+            db, data["lead_id"], data["requirement_id"], data["selected_warehouse_match_id"], selecting=True,
+        )
+        stage = self._stage(db, data["stage_id"], organization_id)
+        if stage.is_terminal:
+            raise DealConflict("Create a Deal in a nonterminal stage, then explicitly close it")
+        self._actor(db, changed_by_user_id)
+        at = datetime.now(timezone.utc)
+        deal = Deal(**data, organization_id=organization_id, stage_entered_at=at)
+        db.add(deal)
+        db.flush()
+        history = self._history(None, stage, changed_by_user_id, at, "Deal created")
+        history.deal_id = deal.id
+        db.add(history)
+        db.flush()
+        return deal
+
     def get_deal(self, db, deal_id):
         deal = self.repository.get_by_id(db, deal_id)
         if deal is None:
@@ -124,12 +144,25 @@ class DealService:
             raise DealNotFound("Deal not found")
         if payload.to_stage_id == deal.stage_id:
             # A retry is a no-op, including a retry of a successful terminal transition.
+            outcome_fields = (
+                "lost_reason_category", "final_commercial_amount", "final_commercial_currency",
+                "final_lease_duration_months", "outcome_notes", "closure_evidence_reference",
+            )
+            if any(getattr(payload, field) is not None for field in outcome_fields):
+                if any(getattr(deal, field) != getattr(payload, field) for field in outcome_fields):
+                    raise DealConflict("Closed Deal outcome evidence cannot be changed")
             db.commit()
             return self.get_deal(db, deal_id)
         if deal.deal_status != "OPEN":
             raise DealConflict("Closed Deals cannot transition or reopen")
         self._boundaries(db, deal.lead_id, deal.requirement_id, deal.selected_warehouse_match_id, deal.organization_id)
         stage = self._stage(db, payload.to_stage_id, deal.organization_id)
+        outcome_fields = (
+            "lost_reason_category", "final_commercial_amount", "final_commercial_currency",
+            "final_lease_duration_months", "outcome_notes", "closure_evidence_reference",
+        )
+        if not stage.is_terminal and any(getattr(payload, field) is not None for field in outcome_fields):
+            raise DealConflict("Outcome evidence is only valid when closing a Deal")
         self._actor(db, changed_by_user_id)
         previous = self.stages.get_by_id(db, deal.stage_id)
         at = datetime.now(timezone.utc)
@@ -140,4 +173,10 @@ class DealService:
             deal.deal_status = "WON" if stage.is_won else "LOST"
             deal.closed_at = at
             deal.closed_reason = payload.change_reason
+            deal.lost_reason_category = payload.lost_reason_category if stage.is_lost else None
+            deal.final_commercial_amount = payload.final_commercial_amount
+            deal.final_commercial_currency = payload.final_commercial_currency
+            deal.final_lease_duration_months = payload.final_lease_duration_months
+            deal.outcome_notes = payload.outcome_notes
+            deal.closure_evidence_reference = payload.closure_evidence_reference
         return self.repository.save(db, deal, history)

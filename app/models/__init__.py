@@ -1,6 +1,6 @@
 from app.models.company import Company
 from app.models.follow_up_task import FollowUpTask, TaskStatus, TaskType
-from app.models.deal import Deal
+from app.models.deal import Deal, LostReasonCategory
 from app.models.deal_pipeline_stage import DealPipelineStage
 from app.models.deal_stage_history import DealStageHistory
 from app.models.decision_maker import (
@@ -55,6 +55,8 @@ from app.models.market_signal import (
     RequirementCandidateStatus,
 )
 from app.models.company_intelligence import *
+from app.models.contact_workflow import ContactInvestigation, ContactOutreachActivity, ContactOutreachMethod, InvestigationStatus, OutreachOutcome
+from app.models.response_qualification import ResponseQualificationAssessment, QualificationRecommendation, QualificationStatus
 from app.models.user import User
 from app.models.warehouse import AvailabilityStatus, Warehouse
 from app.models.warehouse_capability import CapabilityStatus, WarehouseCapabilityProfile
@@ -69,17 +71,34 @@ from app.models.warehouse_match import (
     WarehouseMatch,
     WarehouseMatchStatus,
 )
+from app.models.warehouse_intelligence_conversion import (
+    WarehouseIntelligenceConversionSource,
+    WarehouseIntelligenceConversionStatus,
+    WarehouseIntelligenceOpportunityConversion,
+)
+from app.models.requirement_candidate_conversion import (
+    RequirementCandidateConversion,
+    RequirementCandidateConversionStatus,
+)
+from app.models.warehouse_pilot_assessment import WarehousePilotAssessment
 
 __all__ = [
     "FollowUpTask",
     "TaskStatus",
     "TaskType",
     "Deal",
+    "LostReasonCategory",
     "DealPipelineStage",
     "DealStageHistory",
     "MatchedBy",
     "WarehouseMatch",
     "WarehouseMatchStatus",
+    "WarehouseIntelligenceConversionSource",
+    "WarehouseIntelligenceConversionStatus",
+    "WarehouseIntelligenceOpportunityConversion",
+    "RequirementCandidateConversion",
+    "RequirementCandidateConversionStatus",
+    "WarehousePilotAssessment",
     "ActivityChannel",
     "ActivityOutcome",
     "ActivitySourceType",
@@ -126,6 +145,14 @@ __all__ = [
     "CapabilityStatus",
     "WarehouseCapabilityProfile",
     "CompanyWarehouseRequirementProfile",
+    "ContactInvestigation",
+    "ContactOutreachActivity",
+    "ContactOutreachMethod",
+    "InvestigationStatus",
+    "OutreachOutcome",
+    "ResponseQualificationAssessment",
+    "QualificationRecommendation",
+    "QualificationStatus",
     "ListingStatus",
     "MaintenanceChargeType",
     "OperationalStatus",

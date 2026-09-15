@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, TypeAdapter, model_validator
 
@@ -184,6 +185,82 @@ class ContactResponse(BaseModel):
     contact_quality_score: int
     contact_quality_explanation: dict
     methods: list[ContactMethodResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ContactPriorityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    contact: ContactResponse
+    rank: int
+    priority_score: int = Field(ge=0, le=100)
+    company_prospect_score: int = Field(ge=0, le=100)
+    reasons: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
+class ContactIntelligenceResponse(BaseModel):
+    company_id: int
+    organization_id: int
+    contacts: list[ContactPriorityResponse] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    verified_contact_count: int = Field(ge=0)
+    missing_intelligence: list[str] = Field(default_factory=list)
+    recommended_next_step: str
+
+
+class DecisionMakerRelevance(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class DecisionMakerCompanyResponse(BaseModel):
+    company_id: int
+    company_name: str | None
+
+
+class DecisionMakerAssessmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    contact: ContactResponse
+    company: DecisionMakerCompanyResponse
+    rank: int | None = None
+    relevance: DecisionMakerRelevance
+    relevance_score: int = Field(ge=0, le=100)
+    reasons: list[str] = Field(default_factory=list)
+    observed_facts: list[str] = Field(default_factory=list)
+    inference: str
+    recommendation: str
+    uncertainty: list[str] = Field(default_factory=list)
+    contact_methods: dict[str, bool]
+    contactability_status: str
+    commercial_context: dict
+    company_prospect_priority: str
+    company_prospect_score: int = Field(ge=0, le=100)
+    human_review_required: bool = True
+
+
+class DecisionMakerCompanyAssessmentResponse(BaseModel):
+    company_id: int
+    organization_id: int
+    company_name: str
+    prospect_priority: dict
+    commercial_context: dict
+    contacts: list[DecisionMakerAssessmentResponse] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    human_review_required: bool = True
+
+
+class DecisionMakerQueueItemResponse(BaseModel):
+    company_name: str
+    assessment: DecisionMakerAssessmentResponse
+
+
+class DecisionMakerQueueResponse(BaseModel):
+    items: list[DecisionMakerQueueItemResponse] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    human_review_required: bool = True
 
 
 class WarehouseUseCaseResponse(BaseModel):

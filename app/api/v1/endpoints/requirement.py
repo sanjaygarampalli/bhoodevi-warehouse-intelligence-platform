@@ -11,6 +11,12 @@ from app.schemas.requirement import (
     RequirementUpdate,
 )
 from app.services.requirement import RequirementService
+from app.services.organization_access import (
+    organization_for_lead,
+    organization_for_requirement,
+    require_organization_access,
+    require_organization_write,
+)
 
 router = APIRouter(
     prefix="/leads/{lead_id}/requirements",
@@ -25,8 +31,9 @@ def create_new_requirement(
     lead_id: int,
     requirement: RequirementCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     requirement.lead_id = lead_id
     created = requirement_service.create_requirement(
         db,
@@ -48,6 +55,7 @@ def read_requirements_by_lead(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
     return requirement_service.list_requirements_by_lead(
         db,
         lead_id,
@@ -72,6 +80,8 @@ def read_requirement(
             detail="Requirement not found",
         )
 
+    require_organization_access(db, current_user, organization_for_requirement(db, requirement_id))
+
     return requirement
 
 
@@ -81,11 +91,12 @@ def update_existing_requirement(
     requirement_id: int,
     requirement: RequirementUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     existing = requirement_service.get_requirement_by_id(db, requirement_id)
     if existing is None or existing.lead_id != lead_id:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    require_organization_write(db, current_user, organization_for_requirement(db, requirement_id))
     if "lead_id" in requirement.model_fields_set and requirement.lead_id != lead_id:
         raise HTTPException(status_code=400, detail="lead_id must match the URL")
 
@@ -109,11 +120,12 @@ def delete_existing_requirement(
     lead_id: int,
     requirement_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
     existing = requirement_service.get_requirement_by_id(db, requirement_id)
     if existing is None or existing.lead_id != lead_id:
         raise HTTPException(status_code=404, detail="Requirement not found")
+    require_organization_write(db, current_user, organization_for_requirement(db, requirement_id))
 
     deleted = requirement_service.delete_requirement(
         db,

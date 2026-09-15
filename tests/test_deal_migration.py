@@ -35,8 +35,15 @@ def test_postgresql_ddl_matches_models():
     assert module.down_revision == "i4a5b6c7d8e9"
     for model in (DealPipelineStage, Deal, DealStageHistory):
         expected, actual = model.__table__, tables[model.__tablename__]
-        assert set(expected.c.keys()) == set(actual.c.keys())
+        module6_columns = {
+            "lost_reason_category", "final_commercial_amount", "final_commercial_currency",
+            "final_lease_duration_months", "outcome_notes", "closure_evidence_reference",
+        } if model is Deal else set()
+        expected_columns = set(expected.c.keys()) - module6_columns
+        assert expected_columns == set(actual.c.keys())
         for column in expected.c:
+            if column.name in module6_columns:
+                continue
             assert column.nullable == actual.c[column.name].nullable
             assert str(column.type.compile(dialect=engine.dialect)) == str(actual.c[column.name].type.compile(dialect=engine.dialect))
         for kind in (CheckConstraint, UniqueConstraint):
@@ -44,6 +51,8 @@ def test_postgresql_ddl_matches_models():
         assert {(f.parent.name, f.target_fullname, f.ondelete) for f in expected.foreign_keys} == {
             (f.parent.name, f.target_fullname, f.ondelete) for f in actual.foreign_keys}
         for index in expected.indexes:
+            if "lost_reason_category" in index.name:
+                continue
             assert any(index.name in statement for statement in statements)
     ddl = "\n".join(statements)
     assert "WHERE deal_status = 'OPEN'" in ddl

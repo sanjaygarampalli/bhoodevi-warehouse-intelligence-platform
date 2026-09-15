@@ -16,6 +16,12 @@ from app.services.lead import LeadService
 from app.services.lead_intelligence import LeadIntelligenceService
 from app.schemas.follow_up_task import FollowUpTaskResponse, NextActionTaskCreate
 from app.services.follow_up_task import FollowUpTaskService
+from app.services.organization_access import (
+    organization_for_company,
+    organization_for_lead,
+    require_organization_access,
+    require_organization_write,
+)
 
 router = APIRouter(
     prefix="/leads",
@@ -30,8 +36,9 @@ task_service = FollowUpTaskService()
 @router.post("/{lead_id}/next-action/task", response_model=FollowUpTaskResponse)
 def create_next_action_task(
     lead_id: int, task: NextActionTaskCreate,
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     return task_service.create_from_next_action(db, lead_id, task)
 
 
@@ -54,6 +61,10 @@ def read_prioritized_leads(
     Industry is an exact company-industry filter. Order: priority, score, lead ID.
     Organization is a filter, not an authorization boundary.
     """
+    if organization_id is None and current_user.role != "admin":
+        raise HTTPException(status_code=400, detail="organization_id is required")
+    if organization_id is not None:
+        require_organization_access(db, current_user, organization_id)
     return intelligence_service.list_prioritized_leads(
         db, priority=priority, minimum_score=minimum_score, industry=industry,
         organization_id=organization_id, has_active_requirement=has_active_requirement,
@@ -65,8 +76,9 @@ def read_prioritized_leads(
 def calculate_lead_intelligence(
     lead_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     """Calculate current intelligence and append a score snapshot."""
     result = intelligence_service.create_score_snapshot(db, lead_id)
     if result is None:
@@ -81,6 +93,7 @@ def read_lead_intelligence(
     current_user: User = Depends(get_current_user),
 ):
     """Evaluate current saved data without persisting a snapshot."""
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
     result = intelligence_service.calculate_lead_score(db, lead_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -96,6 +109,7 @@ def read_lead_intelligence_history(
     current_user: User = Depends(get_current_user),
 ):
     """Return immutable evaluations newest first; empty history returns []."""
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
     results = intelligence_service.list_score_history(db, lead_id, limit=limit, offset=offset)
     if results is None:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -106,8 +120,9 @@ def read_lead_intelligence_history(
 def create_new_lead(
     lead: LeadCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_company(db, lead.company_id))
     created = lead_service.create_lead(
         db,
         lead,
@@ -128,6 +143,7 @@ def read_leads_by_company(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    require_organization_access(db, current_user, organization_for_company(db, company_id))
     return lead_service.list_leads_by_company(
         db,
         company_id,
@@ -151,6 +167,8 @@ def read_lead(
             detail="Lead not found",
         )
 
+    require_organization_access(db, current_user, organization_for_lead(db, lead_id))
+
     return lead
 
 
@@ -159,8 +177,9 @@ def update_existing_lead(
     lead_id: int,
     lead: LeadUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     updated = lead_service.update_lead(
         db,
         lead_id,
@@ -180,8 +199,9 @@ def update_existing_lead(
 def delete_existing_lead(
     lead_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
 ):
+    require_organization_write(db, current_user, organization_for_lead(db, lead_id))
     deleted = lead_service.delete_lead(
         db,
         lead_id,

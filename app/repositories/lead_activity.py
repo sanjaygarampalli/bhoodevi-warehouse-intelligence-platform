@@ -19,6 +19,14 @@ class LeadActivityRepository(BaseRepository[LeadActivity]):
         stmt = (
             select(self.model)
             .where(self.model.lead_id == lead_id)
-            .order_by(self.model.activity_date.desc())
+            .order_by(self.model.activity_date.desc(), self.model.id.desc())
+        )
+        return db.execute(stmt).scalars().all()
+
+    def get_by_deal_id(self, db: Session, deal_id: int) -> List[LeadActivity]:
+        stmt = (
+            select(self.model)
+            .where(self.model.deal_id == deal_id)
+            .order_by(self.model.activity_date.desc(), self.model.id.desc())
         )
         return db.execute(stmt).scalars().all()

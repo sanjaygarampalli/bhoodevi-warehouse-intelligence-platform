@@ -12,7 +12,10 @@ from app.core.security import create_access_token
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models import Deal, DealPipelineStage, DealStageHistory, Lead, Requirement, User, WarehouseMatch
+from app.models import (
+    Deal, DealPipelineStage, DealStageHistory, Lead, OrganizationMemberRole,
+    OrganizationMembership, Requirement, User, WarehouseMatch,
+)
 from app.schemas.deal import DealCreate, DealTransition, DealUpdate
 from app.schemas.deal_pipeline_stage import DealPipelineStageUpdate
 from app.services.deal import DealService
@@ -68,6 +71,12 @@ def flow(context):
         "organization_id": org["id"], "company_name": "Prospect", "industry": industry["name"], "company_type": "Private",
     })
     lead = post(client, "/leads/", {"lead_number": "DEAL-1", "company_id": company["id"]})
+    db.add(OrganizationMembership(
+        user_id=2,
+        organization_id=org["id"],
+        role=OrganizationMemberRole.VIEWER,
+    ))
+    db.commit()
     requirement = post(client, f"/leads/{lead['id']}/requirements/", {
         "lead_id": lead["id"], "title": "Distribution space", "minimum_area": 1000,
         "preferred_city": "Bengaluru", "requirement_status": "ACTIVE",
@@ -476,6 +485,8 @@ def test_real_jwt_authentication_and_roles(flow, identity, read_status, write_st
         client.headers["Authorization"] = "Bearer " + create_access_token({"sub": f"deal-{identity}@example.com"})
     for path in ("/deals/", f"/deals/{deal['id']}", f"/deals/{deal['id']}/history", "/deal-pipeline-stages/",
                  f"/deal-pipeline-stages/{deal['stage_id']}"):
+        if path == "/deals/" and identity == "reader":
+            path += f"?organization_id={flow['org']['id']}"
         assert client.get(path).status_code == read_status
     for method, path, data in (
         ("post", "/deals/", payload(flow)), ("put", f"/deals/{deal['id']}", {"notes": "x"}),

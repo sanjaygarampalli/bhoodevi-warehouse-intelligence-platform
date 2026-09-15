@@ -1,13 +1,17 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.company import Company
+    from app.models.warehouse import Warehouse
 
 
 class OperationalStatus(str, enum.Enum):
@@ -55,7 +59,19 @@ class RequirementFlexibility(str, enum.Enum):
 
 class WarehouseOperationalProfile(Base):
     __tablename__ = "warehouse_operational_profiles"
-    __table_args__ = (UniqueConstraint("organization_id", "warehouse_id", name="uq_warehouse_operational_profile_org_warehouse"), Index("ix_warehouse_operational_profiles__warehouse_id", "warehouse_id"))
+    __table_args__ = (
+        UniqueConstraint("organization_id", "warehouse_id", name="uq_warehouse_operational_profile_org_warehouse"),
+        CheckConstraint("year_built IS NULL OR year_built BETWEEN 1800 AND 2200", name="ck_warehouse_operational_profiles__year_built"),
+        CheckConstraint("number_of_blocks IS NULL OR number_of_blocks >= 0", name="ck_warehouse_operational_profiles__number_of_blocks"),
+        CheckConstraint("number_of_floors IS NULL OR number_of_floors >= 0", name="ck_warehouse_operational_profiles__number_of_floors"),
+        CheckConstraint("truck_parking_capacity IS NULL OR truck_parking_capacity >= 0", name="ck_warehouse_operational_profiles__truck_parking_capacity"),
+        CheckConstraint("loading_bays_count IS NULL OR loading_bays_count >= 0", name="ck_warehouse_operational_profiles__loading_bays_count"),
+        CheckConstraint("dock_levelers_count IS NULL OR dock_levelers_count >= 0", name="ck_warehouse_operational_profiles__dock_levelers_count"),
+        CheckConstraint("sanctioned_power_kw IS NULL OR sanctioned_power_kw >= 0", name="ck_warehouse_operational_profiles__sanctioned_power_kw"),
+        CheckConstraint("generator_capacity_kva IS NULL OR generator_capacity_kva >= 0", name="ck_warehouse_operational_profiles__generator_capacity_kva"),
+        CheckConstraint("forklift_capacity_kg IS NULL OR forklift_capacity_kg >= 0", name="ck_warehouse_operational_profiles__forklift_capacity_kg"),
+        CheckConstraint("maximum_rack_height_ft IS NULL OR maximum_rack_height_ft >= 0", name="ck_warehouse_operational_profiles__maximum_rack_height_ft"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -133,7 +149,21 @@ class WarehouseOperationalProfile(Base):
 
 class WarehouseCommercialProfile(Base):
     __tablename__ = "warehouse_commercial_profiles"
-    __table_args__ = (UniqueConstraint("organization_id", "warehouse_id", name="uq_warehouse_commercial_profile_org_warehouse"), Index("ix_warehouse_commercial_profiles__warehouse_id", "warehouse_id"))
+    __table_args__ = (
+        UniqueConstraint("organization_id", "warehouse_id", name="uq_warehouse_commercial_profile_org_warehouse"),
+        CheckConstraint("available_area_sqft IS NULL OR available_area_sqft >= 0", name="ck_warehouse_commercial_profiles__available_area"),
+        CheckConstraint("minimum_leasable_area_sqft IS NULL OR minimum_leasable_area_sqft >= 0", name="ck_warehouse_commercial_profiles__minimum_area"),
+        CheckConstraint("maximum_leasable_area_sqft IS NULL OR maximum_leasable_area_sqft >= 0", name="ck_warehouse_commercial_profiles__maximum_area"),
+        CheckConstraint("minimum_leasable_area_sqft IS NULL OR maximum_leasable_area_sqft IS NULL OR minimum_leasable_area_sqft <= maximum_leasable_area_sqft", name="ck_warehouse_commercial_profiles__area_range"),
+        CheckConstraint("lease_term_min_months IS NULL OR lease_term_min_months >= 0", name="ck_warehouse_commercial_profiles__minimum_lease"),
+        CheckConstraint("lease_term_max_months IS NULL OR lease_term_max_months >= 0", name="ck_warehouse_commercial_profiles__maximum_lease"),
+        CheckConstraint("lease_term_min_months IS NULL OR lease_term_max_months IS NULL OR lease_term_min_months <= lease_term_max_months", name="ck_warehouse_commercial_profiles__lease_range"),
+        CheckConstraint("expected_rent_per_sqft IS NULL OR expected_rent_per_sqft >= 0", name="ck_warehouse_commercial_profiles__rent_per_sqft"),
+        CheckConstraint("expected_monthly_rent IS NULL OR expected_monthly_rent >= 0", name="ck_warehouse_commercial_profiles__monthly_rent"),
+        CheckConstraint("security_deposit_months IS NULL OR security_deposit_months >= 0", name="ck_warehouse_commercial_profiles__deposit"),
+        CheckConstraint("escalation_percentage IS NULL OR escalation_percentage >= 0", name="ck_warehouse_commercial_profiles__escalation"),
+        CheckConstraint("escalation_frequency_months IS NULL OR escalation_frequency_months > 0", name="ck_warehouse_commercial_profiles__escalation_frequency"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -168,7 +198,15 @@ class WarehouseCommercialProfile(Base):
 
 class WarehouseRequirementAssessment(Base):
     __tablename__ = "warehouse_requirement_assessments"
-    __table_args__ = (UniqueConstraint("organization_id", "company_id", name="uq_warehouse_requirement_assessment_org_company"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "company_id", name="uq_warehouse_requirement_assessment_org_company"),
+        CheckConstraint("budget_min IS NULL OR budget_min >= 0", name="ck_warehouse_requirement_assessments__budget_min"),
+        CheckConstraint("budget_max IS NULL OR budget_max >= 0", name="ck_warehouse_requirement_assessments__budget_max"),
+        CheckConstraint("budget_min IS NULL OR budget_max IS NULL OR budget_min <= budget_max", name="ck_warehouse_requirement_assessments__budget_range"),
+        CheckConstraint("preferred_rent_per_sqft IS NULL OR preferred_rent_per_sqft >= 0", name="ck_warehouse_requirement_assessments__rent_per_sqft"),
+        CheckConstraint("maximum_distance_from_city_km IS NULL OR maximum_distance_from_city_km >= 0", name="ck_warehouse_requirement_assessments__city_distance"),
+        CheckConstraint("maximum_distance_from_highway_km IS NULL OR maximum_distance_from_highway_km >= 0", name="ck_warehouse_requirement_assessments__highway_distance"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)

@@ -96,7 +96,7 @@ def update_market_signal(signal_id: int, data: MarketSignalUpdate, db: Session =
 def transition_market_signal(signal_id: int, data: MarketSignalTransition, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     signal = signal_or_404(db, signal_id)
     require_organization_write(db, current_user, signal.organization_id)
-    return service.transition_signal(db, signal, data.target_status)
+    return service.transition_signal(db, signal, data.target_status, current_user, data.review_notes)
 
 
 @router.get("/{signal_id}/evidence", response_model=list[MarketSignalEvidenceResponse])

@@ -1,4 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
+from sqlalchemy import text
+
+from app.db.session import engine
 
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.follow_up_task import router as follow_up_task_router
@@ -23,6 +26,12 @@ from app.api.v1.endpoints.market_signal import router as market_signal_router
 from app.api.v1.endpoints.company_intelligence import router as company_intelligence_router
 from app.api.v1.endpoints.warehouse_capability import router as warehouse_capability_router
 from app.api.v1.endpoints.warehouse_pilot import router as warehouse_pilot_router
+from app.api.v1.endpoints.warehouse_intelligence_conversion import router as warehouse_intelligence_conversion_router
+from app.api.v1.endpoints.requirement_candidate_conversion import router as requirement_candidate_conversion_router
+from app.api.v1.endpoints.warehouse_pilot_assessment import router as warehouse_pilot_assessment_router
+from app.api.v1.endpoints.commercial_outcome_intelligence import router as commercial_outcome_intelligence_router
+from app.api.v1.endpoints.contact_workflow import router as contact_workflow_router, company_history_router
+from app.api.v1.endpoints.response_qualification import router as response_qualification_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -44,6 +53,19 @@ def health():
         "status": "healthy",
         "application": "BWIP",
     }
+
+
+@router.get("/ready")
+def readiness(response: Response):
+    """Report whether the application can reach its configured database."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "not_ready", "application": "BWIP"}
+
+    return {"status": "ready", "application": "BWIP"}
 
 
 router.include_router(auth_router)
@@ -69,3 +91,10 @@ router.include_router(requirement_candidate_router)
 router.include_router(company_intelligence_router)
 router.include_router(warehouse_capability_router)
 router.include_router(warehouse_pilot_router)
+router.include_router(warehouse_intelligence_conversion_router)
+router.include_router(requirement_candidate_conversion_router)
+router.include_router(warehouse_pilot_assessment_router)
+router.include_router(commercial_outcome_intelligence_router)
+router.include_router(contact_workflow_router)
+router.include_router(company_history_router)
+router.include_router(response_qualification_router)

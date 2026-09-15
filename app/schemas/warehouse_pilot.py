@@ -150,7 +150,6 @@ class CommercialProfileResponse(CommercialProfileWrite):
 
 class RequirementAssessmentWrite(PilotBase):
     requirement_source: str | None = None
-    captured_by_user_id: int | None = Field(None, ge=1)
     requirement_confidence: RequirementConfidence = RequirementConfidence.UNVERIFIED
     budget_min: Decimal | None = Field(None, ge=0)
     budget_max: Decimal | None = Field(None, ge=0)
@@ -169,8 +168,6 @@ class RequirementAssessmentWrite(PilotBase):
     possible_tradeoffs: list[str] | None = None
     client_priority_notes: str | None = None
     validation_status: ValidationStatus = ValidationStatus.DRAFT
-    validated_by_user_id: int | None = Field(None, ge=1)
-    validated_at: datetime | None = None
     validation_notes: str | None = None
 
     @model_validator(mode="after")

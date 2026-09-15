@@ -25,6 +25,25 @@ class LeadActivityCreate(BaseModel):
     duration_minutes: int | None = None
     activity_source_type: ActivitySourceType | None = None
     activity_source_id: int | None = None
+    deal_id: int | None = Field(default=None, gt=0)
+    decision_maker_id: int | None = Field(default=None, gt=0)
+
+
+class DealActivityCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_type: ActivityType
+    subject: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    activity_date: datetime | None = None
+    next_followup_date: datetime | None = None
+    status: ActivityStatus = ActivityStatus.SCHEDULED
+    outcome: ActivityOutcome | None = None
+    channel: ActivityChannel | None = None
+    duration_minutes: int | None = None
+    activity_source_type: ActivitySourceType | None = None
+    activity_source_id: int | None = Field(default=None, gt=0)
+    decision_maker_id: int | None = Field(default=None, gt=0)
 
 
 class LeadActivityUpdate(BaseModel):
@@ -41,6 +60,8 @@ class LeadActivityUpdate(BaseModel):
     duration_minutes: int | None = None
     activity_source_type: ActivitySourceType | None = None
     activity_source_id: int | None = None
+    deal_id: int | None = Field(default=None, gt=0)
+    decision_maker_id: int | None = Field(default=None, gt=0)
 
 
 class LeadActivityResponse(BaseModel):
@@ -60,5 +81,7 @@ class LeadActivityResponse(BaseModel):
     duration_minutes: int | None
     activity_source_type: ActivitySourceType | None
     activity_source_id: int | None
+    deal_id: int | None
+    decision_maker_id: int | None
     created_at: datetime
     updated_at: datetime

@@ -2,13 +2,14 @@ from datetime import datetime
 from urllib.parse import urlparse
 
 from pydantic import EmailStr, TypeAdapter, ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.company import Company
 from app.models.company_intelligence import *
 from app.models.market_signal import MarketSignal, MarketSignalStatus
+from app.services.company_prospect_priority import CompanyProspectPriorityService
 
 
 class CompanyIntelligenceError(Exception):
@@ -165,19 +166,70 @@ class CompanyIntelligenceService:
         self.recalc_contact(db, contact, commit=True)
         return self.get_contact(db, contact_id, organization_id)
 
-    def list_contacts(self, db: Session, company_id: int, organization_id: int, page: int, page_size: int):
+    def list_contacts(self, db: Session, company_id: int, organization_id: int, page: int, page_size: int, search: str | None = None, job_title: str | None = None, department=None, seniority=None, verification_status=None, has_linkedin: bool | None = None):
         self.scoped_company(db, company_id, organization_id)
         base = select(CompanyContact).where(CompanyContact.company_id == company_id, CompanyContact.organization_id == organization_id)
+        if search:
+            term = f"%{search.strip()}%"
+            base = base.where(or_(CompanyContact.full_name.ilike(term), CompanyContact.first_name.ilike(term), CompanyContact.last_name.ilike(term), CompanyContact.job_title.ilike(term)))
+        if job_title:
+            base = base.where(CompanyContact.job_title.ilike(f"%{job_title.strip()}%"))
+        if department is not None:
+            base = base.where(CompanyContact.department == department)
+        if seniority is not None:
+            base = base.where(CompanyContact.seniority == seniority)
+        if verification_status is not None:
+            base = base.join(CompanyContactMethod).where(CompanyContactMethod.verification_status == verification_status)
+        if has_linkedin is True:
+            base = base.join(CompanyContactMethod).where(CompanyContactMethod.method_type == ContactMethodType.LINKEDIN)
+        if has_linkedin is False:
+            base = base.where(~CompanyContact.methods.any(CompanyContactMethod.method_type == ContactMethodType.LINKEDIN))
+        base = base.distinct()
         total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
         items = list(db.scalars(base.options(selectinload(CompanyContact.methods)).order_by(CompanyContact.id).offset((page - 1) * page_size).limit(page_size)).all())
         return items, total
 
+    def contact_intelligence(self, db: Session, company_id: int, organization_id: int):
+        self.scoped_company(db, company_id, organization_id)
+        contacts, _ = self.list_contacts(db, company_id, organization_id, 1, 100)
+        company_priority = CompanyProspectPriorityService().assess(db, company_id)
+        prospect_score = company_priority.priority_score if company_priority else 0
+        ranked = []
+        for contact in contacts:
+            score, reasons = self.contact_priority(contact, prospect_score)
+            ranked.append((score, contact.id, contact, reasons))
+        ranked.sort(key=lambda item: (-item[0], item[2].full_name or "", item[1]))
+        items = [{"contact": contact, "rank": rank, "priority_score": score, "company_prospect_score": prospect_score, "reasons": reasons, "human_review_required": True} for rank, (score, _, contact, reasons) in enumerate(ranked, 1)]
+        verified_count = sum(any(method.verification_status == VerificationStatus.VERIFIED for method in contact.methods) for contact in contacts)
+        missing = []
+        if not contacts:
+            missing.append("No structured company contacts are recorded.")
+        if not any(any(method.method_type == ContactMethodType.EMAIL for method in contact.methods) for contact in contacts):
+            missing.append("No business email is recorded.")
+        if not any(any(method.method_type == ContactMethodType.LINKEDIN for method in contact.methods) for contact in contacts):
+            missing.append("No LinkedIn profile is recorded.")
+        return {"company_id": company_id, "organization_id": organization_id, "contacts": items, "total": len(items), "verified_contact_count": verified_count, "missing_intelligence": missing, "recommended_next_step": "Human review of the highest-ranked contact and verification gaps."}
+
     def add_method(self, db: Session, contact_id: int, organization_id: int, data):
         contact = self.get_contact(db, contact_id, organization_id)
         self._validate_method_value(data.value, data.method_type)
+        normalized_value = self._normalize(data.value, data.method_type)
+        duplicate = db.scalar(
+            select(CompanyContactMethod)
+            .join(CompanyContact)
+            .where(
+                CompanyContact.organization_id == organization_id,
+                CompanyContact.company_id == contact.company_id,
+                CompanyContactMethod.method_type == data.method_type,
+                CompanyContactMethod.normalized_value == normalized_value,
+                CompanyContactMethod.contact_id != contact.id,
+            )
+        )
+        if duplicate is not None:
+            raise DuplicateContactMethod("Contact identity already exists for this company")
         if data.is_primary:
             db.execute(update(CompanyContactMethod).where(CompanyContactMethod.contact_id == contact.id).values(is_primary=False))
-        method = CompanyContactMethod(contact_id=contact.id, normalized_value=self._normalize(data.value, data.method_type), **data.model_dump())
+        method = CompanyContactMethod(contact_id=contact.id, normalized_value=normalized_value, **data.model_dump())
         db.add(method)
         try:
             self._commit(db)
@@ -199,10 +251,37 @@ class CompanyIntelligenceService:
     def update_method(self, db: Session, method_id: int, organization_id: int, data):
         method = self.get_method(db, method_id, organization_id)
         values = data.model_dump(exclude_unset=True)
+        if method.verification_status == VerificationStatus.VERIFIED:
+            changing_value = "value" in values and values["value"] != method.value
+            weakening_verification = values.get("is_verified") is False or (
+                values.get("verification_status") is not None
+                and values["verification_status"] != VerificationStatus.VERIFIED
+            )
+            explicit_verified_correction = (
+                values.get("is_verified") is True
+                and values.get("verification_status") == VerificationStatus.VERIFIED
+            )
+            if (changing_value and not explicit_verified_correction) or weakening_verification:
+                raise InvalidContactMethodValue(
+                    "Verified contact methods require an explicit verified correction"
+                )
         if "value" in values:
             self._validate_method_value(values["value"], method.method_type)
+            normalized_value = self._normalize(values["value"], method.method_type)
+            duplicate = db.scalar(
+                select(CompanyContactMethod)
+                .join(CompanyContact)
+                .where(
+                    CompanyContact.organization_id == organization_id,
+                    CompanyContactMethod.method_type == method.method_type,
+                    CompanyContactMethod.normalized_value == normalized_value,
+                    CompanyContactMethod.id != method.id,
+                )
+            )
+            if duplicate is not None:
+                raise DuplicateContactMethod("Contact identity already exists for this organization")
             method.value = values.pop("value")
-            method.normalized_value = self._normalize(method.value, method.method_type)
+            method.normalized_value = normalized_value
         if values.get("is_primary") is True:
             db.execute(update(CompanyContactMethod).where(CompanyContactMethod.contact_id == method.contact_id, CompanyContactMethod.id != method.id).values(is_primary=False))
         if values.get("is_verified") is True:
@@ -237,6 +316,35 @@ class CompanyIntelligenceService:
         if verified:
             reasons.append("Verified contact method")
         return min(score, 100), {"score": min(score, 100), "reasons": reasons}
+
+    @staticmethod
+    def contact_priority(contact, company_prospect_score: int):
+        score = 0
+        reasons = []
+        title = (contact.job_title or "").lower()
+        relevant_terms = ("founder", "owner", "ceo", "managing director", "director", "head", "chief", "operations", "supply chain", "logistics", "warehouse", "procurement")
+        if any(term in title for term in relevant_terms):
+            score += 35
+            reasons.append("Designation contains a warehouse-relevant leadership or operations role.")
+        if contact.seniority in {ContactSeniority.OWNER, ContactSeniority.FOUNDER, ContactSeniority.C_LEVEL, ContactSeniority.VP, ContactSeniority.DIRECTOR, ContactSeniority.HEAD}:
+            score += 25
+            reasons.append("Senior professional level increases investigation relevance.")
+        if contact.department in {ContactDepartment.LOGISTICS, ContactDepartment.SUPPLY_CHAIN, ContactDepartment.WAREHOUSE, ContactDepartment.OPERATIONS, ContactDepartment.PROCUREMENT}:
+            score += 20
+            reasons.append("Department is relevant to warehouse or logistics decisions.")
+        verified = any(method.verification_status == VerificationStatus.VERIFIED for method in contact.methods)
+        if verified:
+            score += 10
+            reasons.append("At least one contact method is verified.")
+        if any(method.method_type == ContactMethodType.EMAIL for method in contact.methods):
+            score += 5
+            reasons.append("Business email is available.")
+        if any(method.method_type == ContactMethodType.LINKEDIN for method in contact.methods):
+            score += 5
+            reasons.append("LinkedIn profile is available.")
+        if company_prospect_score >= 50:
+            reasons.append("Company prospect priority supports human investigation.")
+        return min(score, 100), reasons
 
     def recalc_contact(self, db: Session, contact, commit: bool = True):
         score, explanation = self.contact_quality(contact)

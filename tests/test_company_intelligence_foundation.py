@@ -162,6 +162,48 @@ def test_contact_method_patch_service_rejects_invalid_value_without_writing():
         engine.dispose()
 
 
+def test_verified_contact_method_cannot_be_silently_replaced_or_downgraded(isolated_company_api):
+    db, _, company, _, _, _, method = isolated_company_api
+    method.is_verified = True
+    method.verification_status = VerificationStatus.VERIFIED
+    db.commit()
+
+    with pytest.raises(InvalidContactMethodValue):
+        CompanyIntelligenceService().update_method(
+            db, method.id, company.organization_id, ContactMethodUpdate(value="replacement@example.com")
+        )
+    with pytest.raises(InvalidContactMethodValue):
+        CompanyIntelligenceService().update_method(
+            db, method.id, company.organization_id, ContactMethodUpdate(is_verified=False)
+        )
+
+    db.expire_all()
+    stored = db.get(CompanyContactMethod, method.id)
+    assert stored.value == "a@example.com"
+    assert stored.verification_status is VerificationStatus.VERIFIED
+
+
+def test_verified_contact_method_allows_explicit_verified_correction(isolated_company_api):
+    db, _, company, _, _, _, method = isolated_company_api
+    method.is_verified = True
+    method.verification_status = VerificationStatus.VERIFIED
+    db.commit()
+
+    updated = CompanyIntelligenceService().update_method(
+        db,
+        method.id,
+        company.organization_id,
+        ContactMethodUpdate(
+            value="corrected@example.com",
+            is_verified=True,
+            verification_status=VerificationStatus.VERIFIED,
+        ),
+    )
+
+    assert updated.value == "corrected@example.com"
+    assert updated.verification_status is VerificationStatus.VERIFIED
+
+
 def test_cross_organization_module_one_endpoints_reject_without_state_change(isolated_company_api):
     db, client, company, profile, warehouse, contact, method = isolated_company_api
     before = {
@@ -228,3 +270,75 @@ def test_contact_quality_explanation_matches_deterministic_factors():
     assert "Relevant seniority" in explanation["reasons"]
     assert "Warehouse-related department" in explanation["reasons"]
     assert "Primary contact" in explanation["reasons"]
+
+
+def test_contact_intelligence_filters_and_ranking_are_deterministic(isolated_company_api):
+    db, client, company, *_ = isolated_company_api
+    service = CompanyIntelligenceService()
+    strong = CompanyContact(
+        organization_id=company.organization_id,
+        company_id=company.id,
+        full_name="Supply Chain Director",
+        job_title="Head of Supply Chain",
+        department=ContactDepartment.SUPPLY_CHAIN,
+        seniority=ContactSeniority.HEAD,
+    )
+    same_name = CompanyContact(
+        organization_id=company.organization_id,
+        company_id=company.id,
+        full_name="Supply Chain Director",
+        job_title="Analyst",
+        department=ContactDepartment.OTHER,
+        seniority=ContactSeniority.UNKNOWN,
+    )
+    db.add_all([strong, same_name])
+    db.flush()
+    db.add_all([
+        CompanyContactMethod(
+            contact_id=strong.id,
+            method_type=ContactMethodType.EMAIL,
+            value="Director@Example.com",
+            normalized_value="director@example.com",
+            verification_status=VerificationStatus.VERIFIED,
+            is_verified=True,
+        ),
+        CompanyContactMethod(
+            contact_id=strong.id,
+            method_type=ContactMethodType.LINKEDIN,
+            value="https://www.linkedin.com/in/director",
+            normalized_value="https://www.linkedin.com/in/director",
+        ),
+    ])
+    db.commit()
+
+    first = service.contact_intelligence(db, company.id, company.organization_id)
+    second = service.contact_intelligence(db, company.id, company.organization_id)
+    assert [item["contact"].id for item in first["contacts"]] == [item["contact"].id for item in second["contacts"]]
+    assert first["contacts"][0]["contact"].id == strong.id
+    assert first["contacts"][0]["human_review_required"] is True
+    assert first["contacts"][0]["reasons"]
+
+    items, total = service.list_contacts(db, company.id, company.organization_id, 1, 25, search="Analyst")
+    assert total == 1
+    assert items[0].id == same_name.id
+    items, total = service.list_contacts(db, company.id, company.organization_id, 1, 25, verification_status=VerificationStatus.VERIFIED)
+    assert total == 1
+    assert items[0].id == strong.id
+    assert client.get(f"/companies/{company.id}/contact-intelligence").status_code == 403
+
+
+def test_contact_identity_duplicates_are_rejected_but_same_names_are_allowed(isolated_company_api):
+    db, _, _, _, _, contact, _ = isolated_company_api
+    service = CompanyIntelligenceService()
+    other = CompanyContact(
+        organization_id=contact.organization_id,
+        company_id=contact.company_id,
+        full_name=contact.full_name,
+        department=ContactDepartment.OTHER,
+        seniority=ContactSeniority.UNKNOWN,
+    )
+    db.add(other)
+    db.commit()
+    with pytest.raises(Exception, match="Contact identity already exists"):
+        service.add_method(db, other.id, contact.organization_id, ContactMethodWrite(method_type=ContactMethodType.EMAIL, value="A@EXAMPLE.COM"))
+    assert other.id != contact.id

@@ -33,6 +33,8 @@ try:
 except ImportError:
     HAS_SUBSCRIPTION_TIER = False
 from app.repositories.lead import LeadRepository
+from app.schemas.lead import LeadCreate
+from app.services.lead import LeadService
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -217,6 +219,37 @@ class TestLeadModel:
         db_session.commit()
 
         assert lead.owner_user is user
+
+
+class TestLeadServiceIntegrity:
+    def test_rejects_decision_maker_from_another_company(self, db_session, company, decision_maker):
+        import uuid
+
+        other_org = Organization(
+            public_id=str(uuid.uuid4()), org_code="ORG-OTHER", legal_name="Other Org",
+            org_type=OrgType.PVT_LTD, country="India", subscription_tier="GROWTH",
+            status=OrganizationStatus.ACTIVE,
+        )
+        db_session.add(other_org)
+        db_session.flush()
+        other_company = Company(
+            organization_id=other_org.id, company_name="Other Corp",
+            industry="Logistics", company_type="Private",
+        )
+        db_session.add(other_company)
+        db_session.flush()
+        other_decision_maker = DecisionMaker(
+            company_id=other_company.id, full_name="Other Contact", designation="Director",
+            decision_level=DecisionLevel.DIRECTOR, decision_maker_status=DecisionMakerStatus.NEW,
+        )
+        db_session.add(other_decision_maker)
+        db_session.commit()
+
+        payload = LeadCreate(
+            lead_number="LEAD-CROSS-COMPANY", company_id=company.id,
+            primary_decision_maker_id=other_decision_maker.id,
+        )
+        assert LeadService().create_lead(db_session, payload) is None
 
 
 class TestLeadRepository:
