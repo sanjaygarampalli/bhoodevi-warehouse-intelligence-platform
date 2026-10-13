@@ -40,7 +40,7 @@ class RequirementCandidateConversionService:
 
         company = db.get(Company, candidate.company_id)
         signal = db.get(MarketSignal, candidate.market_signal_id)
-        if company is None or company.organization_id != organization_id or signal is None or signal.organization_id != organization_id:
+        if company is None or company.organization_id != organization_id or signal is None or signal.organization_id != organization_id or (signal.company_id is not None and signal.company_id != company.id):
             raise RequirementCandidateConversionError("Requirement candidate ownership is invalid")
 
         existing = self.repository.get_by_candidate(db, candidate.id, lock=True)

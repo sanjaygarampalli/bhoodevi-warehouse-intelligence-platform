@@ -73,6 +73,7 @@ def build_lead_stack(client, industry, org):
         "preferred_city": "Bengaluru", "requirement_status": "ACTIVE",
     })
     warehouse = post(client, "/warehouses/", {
+        "organization_id": org["id"],
         "warehouse_name": "Distribution Park", "owner_id": 1, "city": "Bengaluru", "state": "Karnataka",
         "total_area_sqft": 2000, "warehouse_type": "COVERED", "availability_status": "AVAILABLE",
     })

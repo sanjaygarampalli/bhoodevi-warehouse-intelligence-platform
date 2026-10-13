@@ -34,6 +34,7 @@ Each row below is generated from the current OpenAPI operations. Parameters incl
 ### Action Intelligence
 
 | Operation | Purpose | Authentication | Organization scope | Request parameters/body | Responses | Mode |
+| `GET /auth/me` | Read authenticated user and active organization context | Required (OAuth2 bearer) | Returns only active memberships belonging to the authenticated user; global admins are not expanded into an organization enumeration | body: ? | `200` (AuthenticatedContextResponse), `401` | Read-only |
 |---|---|---|---|---|---|---|
 | `GET /action-intelligence/actions` | Read Actions | Required (OAuth2 bearer) | Backend/service-dependent; see authorization rules above | `query.priority`, `query.action_type`, `query.limit`, `query.organization_id`; body: ? | `200` (ActionRecommendationListResponse), `422` (HTTPValidationError) | Read-only |
 | `GET /action-intelligence/leads/{lead_id}` | Read Lead Actions | Required (OAuth2 bearer) | Backend/service-dependent; see authorization rules above | `path.lead_id` (required), `query.limit`, `query.organization_id`; body: ? | `200` (ActionRecommendationListResponse), `422` (HTTPValidationError) | Read-only |
@@ -389,3 +390,31 @@ New endpoints are allowed in future modules and do **not** constitute a contract
 - **Paths:** 124
 - **HTTP operations:** 185
 - **Tags:** none declared globally; endpoint tags are listed in the catalog where supplied by each router.
+
+### 2026-10-10 authentication additions
+
+Browser transport clarification (2026-10-11): the React client stores the access
+token only in sessionStorage and sends `Authorization: Bearer`, with fetch
+`credentials: omit`. Persistent legacy localStorage tokens are removed and are
+not migrated. No auth cookie or refresh-token flow exists. CORS does not allow
+cookie credentials. API bearer clients and account-wide revocation are unchanged.
+
+- `POST /auth/logout` revokes all access tokens for the authenticated account,
+  including credentials issued before the revocation migration. Success: 200
+  with a detail message. Frontend awaits server success before clearing storage.
+- `POST /auth/change-password` accepts `current_password` and `password`, checks
+  the current password, changes its hash and revokes all account tokens in one
+  transaction. Reauthentication required; incorrect current password: 400.
+- `POST /auth/users/{user_id}/revoke` is global-admin-only. Body
+  `{ "deactivate": false }` revokes all account credentials; true also deactivates
+  the account. Missing account: 404; ordinary user: 403.
+- JWT `ver` is compared to the durable user token version on every authenticated
+  request. Legacy absent-version tokens map to zero only until first revocation.
+  There is no refresh-token or unauthenticated password-reset endpoint.
+- Shared PostgreSQL quotas cover login/register/change-password and operational
+  dashboard/matching recommendation/generation. 429 includes Retry-After;
+  unavailable quota backing table produces 503 with Retry-After. Unauthorized
+  tenant operations do not consume another user's quota.
+
+The inventory above is the historical baseline, not the current head. Apply
+the forward migration before running the changed application against a database.

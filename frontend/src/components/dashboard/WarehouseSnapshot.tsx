@@ -1,0 +1,3 @@
+import { EmptyState } from '../common/EmptyState'
+import { SectionHeader } from '../common/SectionHeader'
+export function WarehouseSnapshot() { return <section className="panel warehouse-snapshot" id="warehouse-portfolio"><SectionHeader kicker="Portfolio view" title="Warehouse Snapshot" action="Open portfolio" /><div className="snapshot-metrics"><div><span>Total capacity</span><strong>--</strong></div><div><span>Occupied</span><strong>--</strong></div><div><span>Available</span><strong>--</strong></div><div><span>Utilization</span><strong>--</strong></div></div><EmptyState compact title="No warehouse records available.">Capacity, availability, capabilities, and matching opportunities will appear when backend data is connected.</EmptyState></section> }

@@ -23,19 +23,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-def include_object(object_, name, type_, reflected, compare_to):
-    """Keep a proven historical table outside current ORM ownership."""
-    if type_ == "table" and name == "warehouse_requirement_assessments":
-        return False
-    return True
-
-
 def compare_type(context, inspected_column, metadata_column, inspected_type, metadata_type):
-    """Treat PostgreSQL JSON/JSONB representation as an intentional JSON family."""
+    """Normalize identical JSON SQL spellings, retaining JSON/JSONB differences."""
     if isinstance(inspected_type, JSON) and isinstance(metadata_type, JSON):
-        return False
-    if isinstance(inspected_type, JSONB) and isinstance(metadata_type, JSON):
-        return False
+        return (inspected_type.compile(dialect=context.dialect).casefold()
+                != metadata_type.compile(dialect=context.dialect).casefold())
     return None
 
 
@@ -50,7 +42,6 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=compare_type,
-        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -71,8 +62,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=compare_type,
-            include_object=include_object,
-        )
+            )
 
         with context.begin_transaction():
             context.run_migrations()

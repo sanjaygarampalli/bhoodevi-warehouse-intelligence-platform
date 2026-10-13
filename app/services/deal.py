@@ -46,6 +46,8 @@ class DealService:
             if match.requirement_id is not None and match.requirement_id != requirement_id:
                 raise DealConflict("Warehouse match Requirement must match the Deal Requirement")
             warehouse = self._reference(db, Warehouse, match.warehouse_id, "Warehouse")
+            if warehouse.organization_id != company.organization_id:
+                raise DealConflict("Warehouse must belong to the Deal organization")
             if selecting and (match.status in (WarehouseMatchStatus.REJECTED, WarehouseMatchStatus.STALE,
                                                WarehouseMatchStatus.CONVERTED)
                               or warehouse.availability_status not in (

@@ -150,3 +150,9 @@ class Requirement(Base):
     warehouse_matches: Mapped[list["WarehouseMatch"]] = relationship(
         "WarehouseMatch", back_populates="requirement"
     )
+    intelligence_evidence: Mapped[list["RequirementIntelligenceEvidence"]] = relationship(
+        "RequirementIntelligenceEvidence", back_populates="requirement", cascade="all, delete-orphan"
+    )
+    intelligence_assessment: Mapped["RequirementIntelligenceAssessment | None"] = relationship(
+        "RequirementIntelligenceAssessment", back_populates="requirement", uselist=False, cascade="all, delete-orphan"
+    )

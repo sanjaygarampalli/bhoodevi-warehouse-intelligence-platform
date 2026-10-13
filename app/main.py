@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.routes import router
@@ -31,6 +32,15 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="AI-powered Warehouse Demand Intelligence Platform",
     version=settings.APP_VERSION,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    # Authentication is an explicit Authorization header, never an ambient cookie.
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
 logger.info("BWIP Application Started")

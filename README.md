@@ -107,6 +107,28 @@ Current Phase:
 
 **Foundation & Product Design**
 
+### F4 local browser QA data
+
+F4 has a manual, idempotent development-only data path for exercising the real
+authentication, organization-membership, market-signal list, and signal-detail
+flows. It refuses to run unless `APP_ENV=development`, is never called by
+application startup, and does not create data in staging or production.
+
+Set `BWIP_F4_DEV_PASSWORD` in the current local process to a password of at
+least eight characters, then run:
+
+```powershell
+.venv\Scripts\python.exe scripts\seed_f4_dev.py
+```
+
+Use the printed development email with `POST /auth/login` through the normal
+OAuth2 password flow. Do not put the password or token in source, URLs, logs,
+or reports. The script reuses rows identified by its fixed local-development
+email, organization code, company name, and signal title. To clean the data,
+stop local services and remove the rows for organization code `F4QADEV` (the
+organization cascades its memberships and market signals); do not run the
+cleanup against a non-development database.
+
 Upcoming Milestones:
 
 1. Product Documentation

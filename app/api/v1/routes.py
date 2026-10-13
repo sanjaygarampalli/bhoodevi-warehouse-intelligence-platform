@@ -32,6 +32,8 @@ from app.api.v1.endpoints.warehouse_pilot_assessment import router as warehouse_
 from app.api.v1.endpoints.commercial_outcome_intelligence import router as commercial_outcome_intelligence_router
 from app.api.v1.endpoints.contact_workflow import router as contact_workflow_router, company_history_router
 from app.api.v1.endpoints.response_qualification import router as response_qualification_router
+from app.api.v1.endpoints.f5_company_intelligence import router as f5_company_intelligence_router
+from app.api.v1.endpoints.requirement_intelligence import router as requirement_intelligence_router
 from app.core.config import settings
 
 router = APIRouter()
@@ -98,3 +100,5 @@ router.include_router(commercial_outcome_intelligence_router)
 router.include_router(contact_workflow_router)
 router.include_router(company_history_router)
 router.include_router(response_qualification_router)
+router.include_router(f5_company_intelligence_router)
+router.include_router(requirement_intelligence_router)

@@ -182,7 +182,7 @@ class TestEndToEndWorkflow:
             })
 
             # ── Step 4: warehouse + matches ───────────────────────────────
-            wh = post(client, "/warehouses/", {
+            wh = post(client, "/warehouses/", { "organization_id": org["id"],
                 "warehouse_name": "E2E Cold Storage",
                 "owner_id": 1, "city": "Bengaluru", "state": "Karnataka",
                 "total_area_sqft": 10000, "warehouse_type": "COVERED",
@@ -408,7 +408,7 @@ class TestEndToEndWorkflow:
             "minimum_area": 3000, "preferred_city": "Mumbai",
             "requirement_status": "ACTIVE",
         })
-        post(client, "/warehouses/", {
+        post(client, "/warehouses/", { "organization_id": org["id"],
             "warehouse_name": "E2F Wh",
             "owner_id": 1, "city": "Mumbai", "state": "Maharashtra",
             "total_area_sqft": 8000, "warehouse_type": "COVERED",
@@ -454,7 +454,7 @@ class TestEndToEndWorkflow:
             "minimum_area": 2000, "preferred_city": "Delhi",
             "requirement_status": "ACTIVE",
         })
-        post(client, "/warehouses/", {
+        post(client, "/warehouses/", { "organization_id": org["id"],
             "warehouse_name": "E2G Wh", "owner_id": 1,
             "city": "Delhi", "state": "Delhi",
             "total_area_sqft": 5000, "warehouse_type": "COVERED",
@@ -507,7 +507,7 @@ class TestEndToEndWorkflow:
             "minimum_area": 2000, "preferred_city": "Pune",
             "requirement_status": "ACTIVE",
         })
-        post(client, "/warehouses/", {
+        post(client, "/warehouses/", { "organization_id": org["id"],
             "warehouse_name": "E2H Wh", "owner_id": 1,
             "city": "Pune", "state": "Maharashtra",
             "total_area_sqft": 10000, "warehouse_type": "COVERED",
@@ -750,7 +750,7 @@ class TestDealLeadLifecycleIntegration:
             "minimum_area": 5000, "preferred_city": "Pune",
             "requirement_status": "ACTIVE",
         })
-        post(client, "/warehouses/", {
+        post(client, "/warehouses/", { "organization_id": org["id"],
             "warehouse_name": "DLL Wh", "owner_id": 1,
             "city": "Pune", "state": "Maharashtra",
             "total_area_sqft": 20000, "warehouse_type": "COVERED",

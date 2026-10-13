@@ -45,4 +45,9 @@ def get_current_user(
             detail="Inactive user",
         )
 
+    # Version zero accepts pre-migration credentials only until first revocation.
+    version = payload.get("ver", 0)
+    if type(version) is not int or version != user.token_version:
+        raise HTTPException(status_code=401, detail="Session has been revoked")
+
     return user

@@ -207,7 +207,7 @@ class DecisionMakerRelevanceService:
             "company_id": company.id,
             "organization_id": organization_id,
             "company_name": company.company_name,
-            "prospect_priority": prospect,
+            "prospect_priority": prospect.model_dump() if hasattr(prospect, "model_dump") else dict(prospect) if isinstance(prospect, dict) else prospect,
             "commercial_context": pipeline,
             "contacts": [item.model_copy(update={"rank": index}) for index, item in enumerate(assessments, 1)],
             "total": len(assessments),

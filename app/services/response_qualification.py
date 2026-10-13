@@ -102,7 +102,7 @@ class ResponseQualificationService:
 
     def commercial_context(self, db: Session, company_id: int):
         lead_ids = [x for x in db.scalars(select(Lead.id).where(Lead.company_id == company_id, Lead.status.not_in(("WON", "LOST", "DISQUALIFIED"))))]
-        requirement_ids = [x for x in db.scalars(select(Requirement.id).where(Requirement.lead_id.in_(lead_ids), Requirement.status.in_(("DRAFT", "ACTIVE", "ON_HOLD"))))] if lead_ids else []
+        requirement_ids = [x for x in db.scalars(select(Requirement.id).where(Requirement.lead_id.in_(lead_ids), Requirement.requirement_status.in_(("DRAFT", "ACTIVE", "ON_HOLD"))))] if lead_ids else []
         deal_ids = [x for x in db.scalars(select(Deal.id).where(Deal.lead_id.in_(lead_ids), Deal.deal_status == "OPEN"))] if lead_ids else []
         qualification_ids = [x for x in db.scalars(select(ResponseQualificationAssessment.id).where(ResponseQualificationAssessment.company_id == company_id))]
         context = "ACTIVE_DEAL" if deal_ids else "ACTIVE_REQUIREMENT" if requirement_ids else "ACTIVE_LEAD" if lead_ids else "QUALIFICATION_IN_PROGRESS" if qualification_ids else "MARKET_INTELLIGENCE_ONLY"

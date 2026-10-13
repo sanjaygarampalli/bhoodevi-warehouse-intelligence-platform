@@ -13,6 +13,7 @@ from app.schemas.organization import (
     OrganizationUpdate,
 )
 from app.services.organization import OrganizationService
+from app.services.organization_access import require_organization_access
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
@@ -40,7 +41,15 @@ def read_all_organizations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return organization_service.list_organizations(db, skip=skip, limit=limit)
+    if current_user.role == "admin":
+        return organization_service.list_organizations(db, skip=skip, limit=limit)
+    from sqlalchemy import select
+    from app.models.organization import Organization
+    from app.models.organization_membership import OrganizationMembership, MembershipStatus
+    return list(db.scalars(select(Organization).join(OrganizationMembership).where(
+        OrganizationMembership.user_id == current_user.id,
+        OrganizationMembership.status == MembershipStatus.ACTIVE,
+    ).order_by(Organization.id).offset(skip).limit(limit)))
 
 
 @router.get("/public-id/{public_id}", response_model=OrganizationResponse)
@@ -52,6 +61,7 @@ def read_organization_by_public_id(
     organization = organization_service.get_organization_by_public_id(db, str(public_id))
     if organization is None:
         raise HTTPException(status_code=404, detail="Organization not found")
+    require_organization_access(db, current_user, organization.id)
     return organization
 
 
@@ -64,6 +74,7 @@ def read_organization_by_org_code(
     organization = organization_service.get_organization_by_org_code(db, org_code)
     if organization is None:
         raise HTTPException(status_code=404, detail="Organization not found")
+    require_organization_access(db, current_user, organization.id)
     return organization
 
 
@@ -76,6 +87,7 @@ def read_organization(
     organization = organization_service.get_organization_by_id(db, organization_id)
     if organization is None:
         raise HTTPException(status_code=404, detail="Organization not found")
+    require_organization_access(db, current_user, organization.id)
     return organization
 
 

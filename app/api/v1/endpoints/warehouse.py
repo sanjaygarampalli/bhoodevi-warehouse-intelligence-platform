@@ -84,7 +84,7 @@ def update_existing_warehouse(
     if existing is None:
         raise HTTPException(status_code=404, detail="Warehouse not found")
     require_organization_write(db, current_user, existing.organization_id)
-    if warehouse.organization_id is not None and warehouse.organization_id != existing.organization_id:
+    if "organization_id" in warehouse.model_fields_set and warehouse.organization_id != existing.organization_id:
         raise HTTPException(status_code=403, detail="Warehouse organization cannot be changed")
     updated = warehouse_service.update_warehouse(
         db,

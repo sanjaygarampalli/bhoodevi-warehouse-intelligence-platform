@@ -55,6 +55,7 @@ from app.models.market_signal import (
     RequirementCandidateStatus,
 )
 from app.models.company_intelligence import *
+from app.models.f5_company_intelligence import *
 from app.models.contact_workflow import ContactInvestigation, ContactOutreachActivity, ContactOutreachMethod, InvestigationStatus, OutreachOutcome
 from app.models.response_qualification import ResponseQualificationAssessment, QualificationRecommendation, QualificationStatus
 from app.models.user import User
@@ -80,6 +81,13 @@ from app.models.requirement_candidate_conversion import (
     RequirementCandidateConversion,
     RequirementCandidateConversionStatus,
 )
+from app.models.requirement_intelligence import (
+    RequirementEvidenceClassification,
+    RequirementEvidenceVerificationStatus,
+    RequirementFreshness,
+    RequirementIntelligenceAssessment,
+    RequirementIntelligenceEvidence,
+)
 from app.models.warehouse_pilot_assessment import WarehousePilotAssessment
 
 __all__ = [
@@ -98,6 +106,11 @@ __all__ = [
     "WarehouseIntelligenceOpportunityConversion",
     "RequirementCandidateConversion",
     "RequirementCandidateConversionStatus",
+    "RequirementEvidenceClassification",
+    "RequirementEvidenceVerificationStatus",
+    "RequirementFreshness",
+    "RequirementIntelligenceAssessment",
+    "RequirementIntelligenceEvidence",
     "WarehousePilotAssessment",
     "ActivityChannel",
     "ActivityOutcome",
@@ -163,3 +176,5 @@ __all__ = [
     "WarehouseOperationalProfile",
     "WarehouseRequirementAssessment",
 ]
+from app.models.rate_limit import RateLimitBucket
+from app.models.google_login_challenge import GoogleLoginChallenge

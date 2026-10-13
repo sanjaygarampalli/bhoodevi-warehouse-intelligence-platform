@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -21,6 +22,8 @@ pwd_context = CryptContext(
 
 
 def hash_password(password: str) -> str:
+    if len(password.encode("utf-8")) > 72 or "\x00" in password:
+        raise ValueError("Password must be at most 72 UTF-8 bytes and contain no null bytes")
     return pwd_context.hash(password)
 
 
@@ -28,6 +31,8 @@ def verify_password(
     plain_password: str,
     hashed_password: str,
 ) -> bool:
+    if len(plain_password.encode("utf-8")) > 72 or "\x00" in plain_password:
+        return False
     return pwd_context.verify(
         plain_password,
         hashed_password,
@@ -39,6 +44,7 @@ def create_access_token(
     expires_delta: timedelta | None = None,
 ) -> str:
     to_encode = data.copy()
+    to_encode.setdefault("ver", 0)
 
     expire = (
         datetime.now(timezone.utc)
@@ -64,8 +70,11 @@ def decode_access_token(token: str):
             token,
             SECRET_KEY,
             algorithms=[ALGORITHM],
+            options={"require": ["exp", "sub"]},
         )
+        if not isinstance(payload.get("sub"), str) or not payload["sub"]:
+            return None
         return payload
 
-    except JWTError:
+    except PyJWTError:
         return None

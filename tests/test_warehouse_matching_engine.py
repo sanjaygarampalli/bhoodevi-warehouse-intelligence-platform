@@ -13,7 +13,7 @@ from app.core.security import create_access_token
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models import User, Warehouse, WarehouseMatch
+from app.models import User, Warehouse, WarehouseMatch, Requirement
 from app.models.warehouse_match import MatchedBy, WarehouseMatchStatus
 from app.services.warehouse_match import WarehouseMatchService
 from app.services.warehouse_matching_rules import ENGINE_ID
@@ -74,6 +74,7 @@ def flow(context):
         ("Weak", {"total_area_sqft": 100}), ("Inactive", {"availability_status": "INACTIVE"}),
     ]:
         warehouses.append(post(client, "/warehouses/", {
+            "organization_id": organization["id"],
             "warehouse_name": name, "owner_id": 1, "city": "Bengaluru", "state": "Karnataka",
             "total_area_sqft": 1000, "warehouse_type": "COVERED", "availability_status": "AVAILABLE",
             **changes,
@@ -242,7 +243,8 @@ def test_pending_changes_are_not_committed(flow):
 
 def test_full_catalog_and_independent_requirements(flow):
     client, db, requirement, warehouses = flow
-    db.add_all([Warehouse(warehouse_name=f"Additional {i}", owner_id=1, city="Bengaluru",
+    db.add_all([Warehouse(organization_id=db.get(Requirement, requirement["id"]).lead.company.organization_id,
+                          warehouse_name=f"Additional {i}", owner_id=1, city="Bengaluru",
                           state="Karnataka", total_area_sqft=1000, warehouse_type="COVERED",
                           availability_status="AVAILABLE") for i in range(201)])
     db.commit()

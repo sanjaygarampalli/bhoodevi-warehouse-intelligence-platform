@@ -1,4 +1,4 @@
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,10 +30,18 @@ class Settings(BaseSettings):
     # Security
     # ==========================================
     SECRET_KEY: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    AUTH_RATE_LIMIT: int = Field(default=20, ge=1, le=10000)
+    AUTH_RATE_WINDOW_SECONDS: int = Field(default=60, ge=1, le=3600)
+    EXPENSIVE_RATE_LIMIT: int = Field(default=30, ge=1, le=10000)
+    EXPENSIVE_RATE_WINDOW_SECONDS: int = Field(default=60, ge=1, le=3600)
+    CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
     @model_validator(mode="after")
     def validate_deployment_safety(self):
         """Reject unsafe settings for environments intended to serve traffic."""
+        if len(self.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY must contain at least 32 characters")
         if self.APP_ENV.lower() not in {"production", "staging"}:
             return self
 

@@ -46,6 +46,8 @@ def test_candidate_conversion_is_explicit_idempotent_and_preserves_source():
         assert candidate.status == RequirementCandidateStatus.CONVERTED
         assert conversion.requirement_candidate_id == candidate.id
         assert again.id == conversion.id
+        from app.services.requirement_intelligence import RequirementIntelligenceService
+        assert RequirementIntelligenceService().market_signal_ids(db, requirement.id) == [signal.id]
         assert db.scalar(select(Lead.id)) == lead.id
         assert db.scalar(select(Requirement.id)) == requirement.id
         assert db.scalar(select(RequirementCandidateConversion.id)) == conversion.id
@@ -166,4 +168,19 @@ def test_downstream_failure_rolls_back_all_conversion_records(monkeypatch):
         assert db.scalar(select(Requirement.id)) is None
         assert db.scalar(select(RequirementCandidateConversion.id)) is None
         assert db.get(RequirementCandidate, candidate.id).status == RequirementCandidateStatus.ACCEPTED
+    engine.dispose()
+
+def test_candidate_signal_for_different_same_org_company_is_rejected():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        org, _, user, candidate = _candidate_fixture(db)
+        other_company = Company(organization_id=org.id, company_name="Different QA Company", industry="Logistics", company_type="Private")
+        db.add(other_company); db.flush()
+        db.get(MarketSignal, candidate.market_signal_id).company_id = other_company.id
+        db.commit()
+        with pytest.raises(ValueError, match="ownership is invalid"):
+            RequirementCandidateConversionService().convert(db, candidate.id, RequirementCandidateConversionRequest(lead_number="WRONG-PARENT"), user_id=user.id, organization_id=org.id)
+        assert db.scalar(select(Lead.id)) is None
+        assert db.scalar(select(RequirementCandidateConversion.id)) is None
     engine.dispose()

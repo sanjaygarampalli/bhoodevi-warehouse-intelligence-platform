@@ -44,4 +44,6 @@ def convert_requirement_candidate(
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RequirementCandidateConversionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # The request is structurally valid, but the candidate lifecycle or
+        # current conversion state prevents this operation.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

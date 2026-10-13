@@ -67,7 +67,11 @@ Desktop.ini
 llm7-codex-proxy/
 _append_*.py
 temp_*.py
+.audit-tools/
 groq_test.py
 
 # Accidental command/output artifact
 industry.py* -RawGet-Content*
+frontend/test-results/
+frontend/playwright-report/
+.qa-followup*.log

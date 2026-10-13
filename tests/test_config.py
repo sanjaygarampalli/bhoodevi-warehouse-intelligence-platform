@@ -10,6 +10,12 @@ def test_development_settings_remain_usable():
     assert settings.DEBUG is True
 
 
+@pytest.mark.parametrize("value", ["", "short"])
+def test_development_cannot_issue_tokens_with_empty_or_weak_key(value):
+    with pytest.raises(ValidationError):
+        Settings(APP_ENV="development", SECRET_KEY=value)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("DEBUG", True), ("SECRET_KEY", "short")],

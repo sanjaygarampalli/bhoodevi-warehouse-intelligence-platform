@@ -57,10 +57,25 @@ jobs:
         run: python -m alembic upgrade head
 
       - name: Verify PostgreSQL migration revision
-        run: test "$(python -m alembic current | awk '{print $1}')" = "r3d4e5f6a7b8"
+        run: |
+          python -c "from alembic.config import Config; from alembic.script import ScriptDirectory; from alembic.runtime.migration import MigrationContext; from sqlalchemy import create_engine; from app.core.config import settings; engine = create_engine(settings.DATABASE_URL); connection = engine.connect(); assert set(MigrationContext.configure(connection).get_current_heads()) == set(ScriptDirectory.from_config(Config('alembic.ini')).get_heads()); connection.close(); engine.dispose()"
+          python -m alembic check
 
       - name: Run tests
         run: pytest -q
 
       - name: Check whitespace errors
         run: git diff --check
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify frontend
+        working-directory: frontend
+        run: |
+          npm ci --include=dev
+          npm test
+          npm run typecheck
+          npm run build

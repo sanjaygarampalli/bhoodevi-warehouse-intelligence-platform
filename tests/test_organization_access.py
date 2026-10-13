@@ -70,6 +70,65 @@ def test_membership_api_requires_authentication(access_context):
     assert client.get("/organizations/1/members").status_code == 401
 
 
+def test_authenticated_context_requires_authentication(access_context):
+    assert TestClient(app).get("/auth/me").status_code == 401
+
+
+def test_authenticated_context_returns_only_callers_active_memberships(access_context):
+    db, orgs = access_context
+    db.add(OrganizationMembership(user_id=2, organization_id=orgs[1].id, role=OrganizationMemberRole.VIEWER))
+    db.commit()
+    membership = db.query(OrganizationMembership).filter_by(user_id=2, organization_id=orgs[0].id).one()
+    membership.status = MembershipStatus.INACTIVE
+    db.commit()
+
+    response = client_for("org-member@example.com").get("/auth/me")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user"] == {
+        "id": 2,
+        "full_name": "Member",
+        "email": "org-member@example.com",
+        "role": "user",
+        "is_active": True,
+    }
+    assert body["organizations"] == [{
+        "organization_id": orgs[1].id,
+        "public_id": "org-access-2",
+        "org_code": "ACCESS2",
+        "legal_name": "Access Two",
+        "trading_name": None,
+        "role": "VIEWER",
+        "status": "ACTIVE",
+    }]
+
+
+def test_authenticated_context_returns_multiple_active_memberships(access_context):
+    db, orgs = access_context
+    db.add(OrganizationMembership(user_id=2, organization_id=orgs[1].id, role=OrganizationMemberRole.ADMIN))
+    db.commit()
+
+    organizations = client_for("org-member@example.com").get("/auth/me").json()["organizations"]
+
+    assert [item["organization_id"] for item in organizations] == [orgs[0].id, orgs[1].id]
+
+
+def test_authenticated_context_returns_empty_for_no_active_memberships(access_context):
+    db, orgs = access_context
+    membership = db.query(OrganizationMembership).filter_by(user_id=2, organization_id=orgs[0].id).one()
+    membership.status = MembershipStatus.INACTIVE
+    db.commit()
+
+    assert client_for("org-member@example.com").get("/auth/me").json()["organizations"] == []
+
+
+def test_global_admin_context_does_not_enumerate_organizations(access_context):
+    body = client_for("org-global@example.com").get("/auth/me").json()
+
+    assert body["organizations"] == []
+
+
 def test_only_org_admin_can_manage_members_and_duplicate_is_rejected(access_context):
     db, orgs = access_context
     member = client_for("org-member@example.com")

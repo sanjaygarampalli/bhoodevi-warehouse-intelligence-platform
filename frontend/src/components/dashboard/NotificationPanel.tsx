@@ -1,0 +1,3 @@
+import { EmptyState } from '../common/EmptyState'
+import { SectionHeader } from '../common/SectionHeader'
+export function NotificationPanel() { return <section className="panel notification-panel" id="notifications"><SectionHeader kicker="Attention queue" title="Notifications" /><EmptyState compact title="No notifications yet.">New signals, prospects, requirements, follow-ups, and matches will appear here when available.</EmptyState></section> }

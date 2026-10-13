@@ -13,9 +13,12 @@ must be performed by the deployment owner.
   `SECRET_KEY` is shorter than 32 characters, the database is not PostgreSQL,
   or the database URL still contains the documented placeholder credentials.
 - Secrets remain environment-provided and `.env` remains ignored by Git.
-- No CORS middleware is currently configured. The API is therefore not
-  claiming browser cross-origin support; if a separate browser frontend is
-  introduced, configure an explicit origin allowlist before deployment.
+- CORS uses configurable exact `CORS_ORIGINS` (default `http://localhost:5173`)
+  and permits the explicit Authorization header without cookie credentials.
+  Set the actual HTTPS frontend origins before deployment. The browser keeps
+  its 60-minute bearer token in sessionStorage; this remains readable by
+  same-origin JavaScript. See the current acceptance review in
+  [`development/BWIP_COMPLETE_PROJECT_AUDIT.md`](development/BWIP_COMPLETE_PROJECT_AUDIT.md).
 
 ## Required deployment procedure
 

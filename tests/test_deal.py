@@ -82,6 +82,7 @@ def flow(context):
         "preferred_city": "Bengaluru", "requirement_status": "ACTIVE",
     })
     warehouse = post(client, "/warehouses/", {
+        "organization_id": org["id"],
         "warehouse_name": "Distribution Park", "owner_id": 1, "city": "Bengaluru", "state": "Karnataka",
         "total_area_sqft": 1000, "warehouse_type": "COVERED", "availability_status": "AVAILABLE",
     })
@@ -485,7 +486,7 @@ def test_real_jwt_authentication_and_roles(flow, identity, read_status, write_st
         client.headers["Authorization"] = "Bearer " + create_access_token({"sub": f"deal-{identity}@example.com"})
     for path in ("/deals/", f"/deals/{deal['id']}", f"/deals/{deal['id']}/history", "/deal-pipeline-stages/",
                  f"/deal-pipeline-stages/{deal['stage_id']}"):
-        if path == "/deals/" and identity == "reader":
+        if path in ("/deals/", "/deal-pipeline-stages/") and identity == "reader":
             path += f"?organization_id={flow['org']['id']}"
         assert client.get(path).status_code == read_status
     for method, path, data in (

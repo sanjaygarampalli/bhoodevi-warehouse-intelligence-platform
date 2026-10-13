@@ -1,0 +1,1 @@
+export function KpiCard({ label, detail, value }: { label: string; detail: string; value?: number }) { return <article className="kpi-card"><span className="kpi-label">{label}</span><strong>{value ?? '--'}</strong><span className="kpi-detail">{detail}</span></article> }

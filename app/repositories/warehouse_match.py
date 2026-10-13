@@ -6,12 +6,21 @@ from sqlalchemy.orm import Session, raiseload
 from app.models.warehouse_match import WarehouseMatch, WarehouseMatchStatus
 from app.models.warehouse import AvailabilityStatus, Warehouse
 from app.models.requirement import Requirement
+from app.models.company import Company
+from app.models.lead import Lead
 from app.repositories.base import BaseRepository
 
 
 class WarehouseMatchRepository(BaseRepository[WarehouseMatch]):
     def __init__(self) -> None:
         super().__init__(model=WarehouseMatch)
+
+    def _stock_scope(self, requirement_id: int):
+        organization = (select(Company.organization_id)
+                        .join(Lead, Lead.company_id == Company.id)
+                        .join(Requirement, Requirement.lead_id == Lead.id)
+                        .where(Requirement.id == requirement_id).scalar_subquery())
+        return Warehouse.organization_id == organization
 
     def lock_requirement(self, db: Session, requirement_id: int) -> Requirement | None:
         return db.scalar(select(Requirement).where(Requirement.id == requirement_id)
@@ -29,6 +38,7 @@ class WarehouseMatchRepository(BaseRepository[WarehouseMatch]):
     ) -> list[Warehouse]:
         existing = select(self.model.warehouse_id).where(self.model.requirement_id == requirement_id)
         return list(db.scalars(select(Warehouse).where(
+            self._stock_scope(requirement_id),
             Warehouse.availability_status.in_(eligible_statuses) | Warehouse.id.in_(existing)
         ).order_by(Warehouse.id).options(raiseload("*"))
           .execution_options(populate_existing=True)))
@@ -44,7 +54,7 @@ class WarehouseMatchRepository(BaseRepository[WarehouseMatch]):
                 (WarehouseMatch.warehouse_id == Warehouse.id)
                 & (WarehouseMatch.requirement_id == requirement_id)
             ))
-            .where(Warehouse.availability_status.in_(eligible_statuses))
+            .where(self._stock_scope(requirement_id), Warehouse.availability_status.in_(eligible_statuses))
             .order_by(Warehouse.id)
             .options(raiseload("*"))
             .execution_options(yield_per=batch_size)

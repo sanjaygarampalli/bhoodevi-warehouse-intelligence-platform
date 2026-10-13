@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.dependencies_admin import get_current_admin
 from app.models.user import User
+from app.core.rate_limit import limit_expensive_operation
 from app.schemas.warehouse_match import (
     WarehouseMatchCreate,
     WarehouseMatchResponse,
@@ -37,6 +38,7 @@ def generate_warehouse_matches(
     current_user: User = Depends(get_current_user),
 ):
     require_organization_write(db, current_user, organization_for_requirement(db, requirement_id))
+    limit_expensive_operation(db, current_user)
     """Generate or refresh persisted rule-based matches without replacing reviews."""
     try:
         result = match_service.generate_matches_for_requirement(db, requirement_id)
@@ -58,6 +60,7 @@ def recommend_warehouses(
     if organization_id is None:
         raise HTTPException(status_code=404, detail="Requirement not found")
     require_organization_access(db, current_user, organization_id)
+    limit_expensive_operation(db, current_user)
     """Recalculate ranked recommendations without modifying saved matches."""
     result = match_service.recommend_for_requirement(db, requirement_id, limit=limit)
     if result is None:
@@ -72,6 +75,12 @@ def create_new_warehouse_match(
     current_user: User = Depends(get_current_user),
 ):
     require_organization_write(db, current_user, organization_for_lead(db, match.lead_id))
+    from app.models.warehouse import Warehouse
+    warehouse = db.get(Warehouse, match.warehouse_id)
+    if warehouse is None:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+    if warehouse.organization_id != organization_for_lead(db, match.lead_id):
+        raise HTTPException(status_code=403, detail="Warehouse and lead must belong to the same organization")
     created = match_service.create_match(db, match)
     if created is None:
         raise HTTPException(
@@ -86,8 +95,8 @@ def read_warehouse_matches(
     lead_id: int | None = None,
     warehouse_id: int | None = None,
     requirement_id: int | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(100, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -161,6 +170,19 @@ def update_existing_warehouse_match(
     if existing is None:
         raise HTTPException(status_code=404, detail="Warehouse match not found")
     require_organization_write(db, current_user, organization_for_match(db, match_id))
+    if any(field in match.model_fields_set and getattr(match, field) != getattr(existing, field)
+           for field in ("lead_id", "warehouse_id", "requirement_id")):
+        from app.services.deal_workflow import protect_deal_reference
+        protect_deal_reference(db, "match", match_id)
+    if "lead_id" in match.model_fields_set and match.lead_id != existing.lead_id:
+        raise HTTPException(status_code=403, detail="Match lead cannot be changed")
+    if "warehouse_id" in match.model_fields_set:
+        from app.models.warehouse import Warehouse
+        warehouse = db.get(Warehouse, match.warehouse_id)
+        if warehouse is None:
+            raise HTTPException(status_code=404, detail="Warehouse not found")
+        if warehouse.organization_id != organization_for_match(db, match_id):
+            raise HTTPException(status_code=403, detail="Warehouse and lead must belong to the same organization")
     updated = match_service.update_match(db, match_id, match)
     if updated is None:
         raise HTTPException(status_code=404, detail="Warehouse match not found")

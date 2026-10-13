@@ -14,7 +14,7 @@ class RequirementCandidateConversionRepository:
             joinedload(RequirementCandidateConversion.requirement),
         )
         if lock:
-            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+            stmt = stmt.with_for_update(of=RequirementCandidateConversion).execution_options(populate_existing=True)
         return db.scalar(stmt)
 
     def create_pending(self, db: Session, conversion):

@@ -180,6 +180,15 @@ def update_existing_lead(
     current_user: User = Depends(get_current_user),
 ):
     require_organization_write(db, current_user, organization_for_lead(db, lead_id))
+    existing = lead_service.get_lead_by_id(db, lead_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if "company_id" in lead.model_fields_set and lead.company_id != existing.company_id:
+        from app.services.deal_workflow import protect_deal_reference
+        from app.services.follow_up_workflow import protect_task_reference
+        protect_deal_reference(db, "lead", lead_id)
+        protect_task_reference(db, "lead", lead_id)
+        raise HTTPException(status_code=403, detail="Lead company cannot be changed")
     updated = lead_service.update_lead(
         db,
         lead_id,

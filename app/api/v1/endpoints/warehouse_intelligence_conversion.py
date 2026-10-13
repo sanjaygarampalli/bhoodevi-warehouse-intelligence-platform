@@ -48,7 +48,9 @@ def convert_warehouse_match(
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (ValueError, WarehouseIntelligenceConversionError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        # Conversion is a valid, human-initiated request that can conflict
+        # with match lifecycle, ownership, or an existing conversion.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get(

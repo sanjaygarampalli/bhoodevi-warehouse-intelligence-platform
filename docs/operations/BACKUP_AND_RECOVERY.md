@@ -50,3 +50,21 @@ Use this sequence when a migration release fails:
 
 Production restore, failover, and migration recovery have not been exercised
 by this repository and remain deployment-owner responsibilities.
+
+## Local synthetic rehearsal (2026-10-10)
+
+`python -m scripts.verify_followup_runtime --backup-only` creates an isolated
+source database and a distinct empty restoration database. It uses PostgreSQL
+17 pg_dump custom format and pg_restore with --no-owner/--no-acl, validates the
+head/schema and every public table's row count, checks commercial relationships
+and tenant ownership, starts the restored application, tests login/readiness,
+foreign-tenant denial and a legitimate matching write. It removes exactly its
+own databases and temporary synthetic archive. BWIP_PG_BIN can specify the
+local PostgreSQL client directory.
+
+Results/timing: docs/development/evidence/2026-10-10/backup-restore.json. This
+archive contains synthetic records only and is temporarily unencrypted. It
+does not test the operator's encrypted/off-host backup service, key recovery,
+retention or storage permissions. Those controls remain BLOCKED. The measured
+time is a local observation, not an adopted RTO/RPO. Real data must follow the
+encrypted backup policy above and must never be placed in this QA fixture.

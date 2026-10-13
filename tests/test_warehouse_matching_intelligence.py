@@ -31,7 +31,7 @@ def requirement(**changes):
 
 
 def warehouse(**changes):
-    values = dict(id=1, warehouse_name="Central warehouse", owner_id=1, city="Bengaluru",
+    values = dict(id=1, organization_id=1, warehouse_name="Central warehouse", owner_id=1, city="Bengaluru",
                   state="Karnataka", postal_code="560001", total_area_sqft=1000,
                   built_up_area_sqft=800, open_area_sqft=200,
                   warehouse_type=WarehouseType.COVERED, availability_status=AvailabilityStatus.AVAILABLE)
